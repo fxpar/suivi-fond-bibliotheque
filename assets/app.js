@@ -17,11 +17,44 @@
   drop.addEventListener('drop', ev => ev.dataTransfer.files.length && load([...ev.dataTransfer.files]));
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length && !$('#results').hidden) load([...e.dataTransfer.files]); });
-  $('#btnReset').addEventListener('click', () => {
-    Object.assign(state, { items: [], sheets: [], files: [], ctx: null, fonds: ALL, open: null });
+  function reset() {
+    Object.assign(state, { items: [], sheets: [], files: [], ctx: null, fonds: ALL, open: null, allP: null });
     input.value = '';
-    $('#results').hidden = true; $('#dropSection').hidden = false; $('#topActions').hidden = true;
-  });
+    $('#results').hidden = true; $('#dropSection').hidden = false;
+    $('#btnReset').hidden = true; $('#btnMenu').hidden = true;
+    closeDrawer();
+  }
+  $('#btnReset').addEventListener('click', reset);
+  $('#drawerReset').addEventListener('click', reset);
+
+  // ---------- thème jour / nuit ----------
+  const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const isDark = () => (document.documentElement.getAttribute('data-theme') || (mqDark.matches ? 'dark' : 'light')) === 'dark';
+  function paintTheme() {
+    const d = isDark();
+    document.documentElement.classList.toggle('is-dark', d);
+    $('#btnTheme').setAttribute('aria-label', d ? 'Passer en mode clair' : 'Passer en mode sombre');
+    $('#drawerTheme').textContent = d ? '☀ Mode clair' : '☾ Mode sombre';
+  }
+  function toggleTheme() {
+    const next = isDark() ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('suivi-fonds-theme', next); } catch (_) { /* rien */ }
+    paintTheme();
+  }
+  $('#btnTheme').addEventListener('click', toggleTheme);
+  $('#drawerTheme').addEventListener('click', toggleTheme);
+  mqDark.addEventListener?.('change', paintTheme);
+  paintTheme();
+
+  // ---------- menu latéral (mobile) ----------
+  function openDrawer() { $('#drawer').hidden = false; $('#drawerBack').hidden = false; requestAnimationFrame(() => $('#drawer').classList.add('in')); }
+  function closeDrawer() { $('#drawer').classList.remove('in'); $('#drawer').hidden = true; $('#drawerBack').hidden = true; }
+  $('#btnMenu').addEventListener('click', openDrawer);
+  $('#fondsBtn').addEventListener('click', openDrawer);
+  $('#drawerClose').addEventListener('click', closeDrawer);
+  $('#drawerBack').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#drawer').hidden) closeDrawer(); });
 
   async function load(files) {
     const err = $('#loadError'); err.hidden = true;
@@ -40,8 +73,11 @@
         throw new Error('Aucune ligne exploitable trouvée. Vérifiez que la feuille contient bien des en-têtes comme « Cote », « Titre », « Dernier emprunt », « Nb prêts année »…');
       }
       if (nDec) setTimeout(() => toast(`${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'} depuis le classeur annoté.`), 300);
-      Object.assign(state, { items, sheets, files: files.map(f => f.name), ctx: SF.context(items), fonds: ALL, open: null });
-      $('#dropSection').hidden = true; $('#results').hidden = false; $('#topActions').hidden = false;
+      // texte de recherche pré-calculé (titre, série, auteur)
+      for (const it of items) it._s = SF.norm(`${it.titre} ${it.serie} ${it.tome ?? ""} ${it.auteur}`);
+      Object.assign(state, { items, sheets, files: files.map(f => f.name), ctx: SF.context(items), fonds: ALL, open: null, allP: null });
+      $('#dropSection').hidden = true; $('#results').hidden = false;
+      $('#btnReset').hidden = false; $('#btnMenu').hidden = false;
       render();
       window.scrollTo(0, 0);
     } catch (e) {
@@ -70,6 +106,7 @@
   }));
 
   function render() {
+    state.allP = null;
     const c = SF.computed();
     renderContext();
     renderChips();
@@ -97,13 +134,18 @@
 
   function renderChips() {
     const names = fondsNames();
-    const box = $('#fondsChips');
-    if (names.length < 2) { box.innerHTML = ''; box.parentElement.hidden = true; return; }
+    const box = $('#fondsChips'), dbox = $('#drawerFonds');
+    if (names.length < 2) { box.innerHTML = ''; dbox.innerHTML = '<p class="muted">Un seul fonds dans ce fichier.</p>'; box.parentElement.hidden = true; return; }
     box.parentElement.hidden = false;
     const count = n => state.items.filter(i => i.fonds === n).length;
-    box.innerHTML = [[ALL, 'Tous les fonds', state.items.length], ...names.map(n => [n, n, count(n)])]
-      .map(([v, l, n]) => `<button class="chip" role="tab" aria-selected="${state.fonds === v}" data-v="${esc(v)}">${esc(l)} <span>${F.int(n)}</span></button>`).join('');
-    box.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => { state.fonds = b.dataset.v; state.open = null; render(); }));
+    const opts = [[ALL, 'Tous les fonds', state.items.length], ...names.map(n => [n, n, count(n)])];
+    box.innerHTML = opts.map(([v, l, n]) => `<button class="chip" role="tab" aria-selected="${state.fonds === v}" data-v="${esc(v)}">${esc(l)} <span>${F.int(n)}</span></button>`).join('');
+    dbox.innerHTML = opts.map(([v, l, n]) => `<button class="dopt" type="button" aria-pressed="${state.fonds === v}" data-v="${esc(v)}"><span>${esc(l)}</span><small>${F.int(n)}</small></button>`).join('');
+    const cur = opts.find(o => o[0] === state.fonds);
+    $('#fondsBtn').innerHTML = `${esc(cur[1])} <span>${F.int(cur[2])}</span> <b aria-hidden="true">▾</b>`;
+    const pick = v => { state.fonds = v; state.open = null; closeDrawer(); render(); };
+    box.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => pick(b.dataset.v)));
+    dbox.querySelectorAll('.dopt').forEach(b => b.addEventListener('click', () => pick(b.dataset.v)));
   }
 
   // ---------- vue d'ensemble ----------
@@ -171,7 +213,7 @@
   }
 
   // ---------- à examiner ----------
-  const isDone = (p, r) => !!SF.dec.get(SF.decKey(p.id, r));
+  const isDone = (p, r) => SF.dec.isDone(SF.decKey(p.id, r));
   const doneCount = p => p.rows.reduce((a, r) => a + (isDone(p, r) ? 1 : 0), 0);
   const doneLabel = p => { const n = doneCount(p); return n ? `${F.int(n)} ${F.plural(n, 'décidé')} sur ${F.int(p.rows.length)}` : ''; };
 
@@ -218,7 +260,8 @@
   }
 
   // Un seul écouteur pour tous les boutons de décision (la liste est redessinée souvent)
-  $('#tab-review').addEventListener('click', e => {
+  // (listes et fiche partagent les mêmes boutons et les mêmes clés)
+  document.addEventListener('click', e => {
     const b = e.target.closest('.dec button');
     if (!b) return;
     const wrap = b.parentElement, k = wrap.dataset.k, ch = b.dataset.d;
@@ -227,8 +270,8 @@
     SF.dec.set(k, off ? null : ch);
     wrap.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(!off && x === b)));
     const tr = wrap.closest('tr');
-    tr.classList.toggle('done', !off);
-    tr.querySelector('.dmeta')?.remove();
+    if (tr) { tr.classList.toggle('done', !off); tr.querySelector('.dmeta')?.remove(); }
+    if (wrap.closest('#fiche')) { state.ficheDirty = true; navigator.vibrate?.(20); }
     const p = state.c && state.c.pistes.find(x => x.id === wrap.dataset.p);
     if (p) {
       const nd = doneCount(p);
@@ -240,10 +283,15 @@
   });
 
   function decCell(p, r) {
-    const k = SF.decKey(p.id, r), cur = SF.dec.get(k);
-    const choices = SF.CHOICES[p.id];
-    const other = cur && !choices.includes(cur.d) ? `${esc(cur.d)} · ` : '';
-    return `<td class="dcell"><div class="dec" data-k="${esc(k)}" data-p="${p.id}" role="group" aria-label="Décision">${choices.map(ch => `<button type="button" data-d="${esc(ch)}" aria-pressed="${!!cur && cur.d === ch}">${esc(ch)}</button>`).join('')}</div>${cur ? `<small class="dmeta">${other}le ${esc(cur.date.split('-').reverse().join('/'))}${cur.com ? ' · ' + esc(cur.com) : ''}</small>` : ''}</td>`;
+    return `<td class="dcell">${decGroup(p.id, SF.decKey(p.id, r))}</td>`;
+  }
+
+  function decGroup(pid, k, noCom) {
+    const cur = SF.dec.get(k);
+    const choices = SF.CHOICES[pid];
+    const other = cur && cur.d && !choices.includes(cur.d) ? `${esc(cur.d)} · ` : '';
+    const meta = cur && (cur.d || (cur.com && !noCom)) ? `<small class="dmeta">${other}le ${esc(cur.date.split('-').reverse().join('/'))}${cur.com && !noCom ? ' · ' + esc(cur.com) : ''}</small>` : '';
+    return `<div class="dec" data-k="${esc(k)}" data-p="${pid}" role="group" aria-label="Décision">${choices.map(ch => `<button type="button" data-d="${esc(ch)}" aria-pressed="${!!cur && cur.d === ch}">${esc(ch)}</button>`).join('')}</div>${meta}`;
   }
 
   function listTable(p) {
@@ -285,9 +333,9 @@
           <button class="btn" id="exXlsx">Télécharger le classeur</button>
         </article>
         <article class="ex">
-          <h3>Synthèse pour la direction <span class="fmt">PowerPoint</span></h3>
-          <p>Six diapositives au plus : chiffres clés, circulation, poids des fonds, âge des collections, pistes de gestion et leur volume. Graphiques modifiables.</p>
-          <button class="btn" id="exPptx">Télécharger la synthèse</button>
+          <h3>Synthèse pour la direction <span class="fmt">PowerPoint</span> <span class="fmt">PDF</span></h3>
+          <p>Six pages au plus : chiffres clés, circulation, poids des fonds, âge des collections, pistes de gestion et leur volume. Le PowerPoint garde des graphiques modifiables ; le PDF se transmet tel quel.</p>
+          <div class="btnrow"><button class="btn" id="exPptx">PowerPoint</button><button class="btn" id="exPdf">PDF</button></div>
         </article>
         <article class="ex">
           <h3>Demander un avis à une IA <span class="fmt">Texte</span></h3>
@@ -310,6 +358,7 @@
     });
     $('#exXlsx').addEventListener('click', e => run(e.target, () => SF.exportXlsx(SF.computed())));
     $('#exPptx').addEventListener('click', e => run(e.target, () => SF.exportPptx(SF.computed())));
+    $('#exPdf').addEventListener('click', e => run(e.target, () => SF.exportPdf(SF.computed())));
     $('#exIA').addEventListener('click', async () => {
       const txt = SF.promptIA(SF.computed());
       try { await navigator.clipboard.writeText(txt); toast('Résumé copié : collez-le dans votre assistant IA.'); }
@@ -329,6 +378,111 @@
     const el = $('#toast'); el.textContent = msg; el.hidden = false;
     clearTimeout(toast.t); toast.t = setTimeout(() => { el.hidden = true; }, 3500);
   }
+
+  // ---------- recherche d'un exemplaire ----------
+  const qIn = $('#q'), sres = $('#sresults');
+  const cmpFr = (a, b) => String(a || '').localeCompare(String(b || ''), 'fr', { numeric: true });
+  const allPistes = () => (state.allP = state.allP || SF.pistes(state.items, state.ctx, state.opts));
+
+  function search(q) {
+    const n = SF.norm(q);
+    if (n.length < 2) return [];
+    const dg = q.replace(/\D/g, ''), compact = n.replace(/ /g, ''), toks = n.split(' ');
+    const out = [];
+    for (const it of state.items) {
+      let score = 0;
+      if (dg.length >= 4 && it.cb) score = it.cb === dg ? 100 : it.cb.includes(dg) ? 60 : 0;
+      if (!score && compact.length >= 3 && SF.norm(it.cote).replace(/ /g, '').includes(compact)) score = 40;
+      if (!score && toks.every(t => it._s.includes(t))) score = it._s.startsWith(n) ? 30 : 20;
+      if (score) out.push([score, it]);
+    }
+    out.sort((a, b) => b[0] - a[0] || cmpFr(a[1].cote, b[1].cote) || cmpFr(a[1].titre, b[1].titre));
+    return out.map(x => x[1]);
+  }
+
+  function showResults(q) {
+    if (!q.trim()) { sres.hidden = true; return; }
+    const list = search(q);
+    state.results = list;
+    if (!list.length) { sres.innerHTML = '<p class="sempty">Aucun exemplaire trouvé.</p>'; sres.hidden = false; return; }
+    sres.innerHTML = list.slice(0, 30).map((it, i) => {
+      const noted = SF.dec.get(SF.decKey('rayon', { it }));
+      return `<button type="button" class="sitem" role="option" data-i="${i}"><span class="cote">${esc(it.cote)}</span><span class="st"><strong>${esc(it.titre)}</strong><small>${it.serie ? esc(it.serie) + (it.tome != null ? ' · t. ' + it.tome : '') + ' · ' : ''}${esc(it.fonds)}${it.cb ? ' · ' + esc(it.cb) : ''}</small></span>${noted ? '<span class="sdot" title="Constat noté"></span>' : ''}</button>`;
+    }).join('') + (list.length > 30 ? `<p class="sempty">${F.int(list.length - 30)} autres résultats : précisez la recherche.</p>` : '');
+    sres.hidden = false;
+  }
+  let qT;
+  qIn.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => showResults(qIn.value), 120); });
+  qIn.addEventListener('focus', () => { if (qIn.value.trim()) showResults(qIn.value); });
+  qIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); showResults(qIn.value); if (state.results && state.results.length === 1) openFiche(state.results[0]); }
+    if (e.key === 'Escape') { qIn.value = ''; sres.hidden = true; }
+  });
+  sres.addEventListener('click', e => { const b = e.target.closest('.sitem'); if (b) openFiche(state.results[+b.dataset.i]); });
+  document.addEventListener('click', e => { if (!e.target.closest('.search')) sres.hidden = true; });
+
+  /** Utilisé par le scanner : ouvre la fiche si le code désigne un seul exemplaire */
+  SF.findCode = function (code) {
+    const digits = String(code).replace(/\D/g, '');
+    qIn.value = digits.length >= 6 ? digits : String(code).trim();
+    showResults(qIn.value);
+    const exact = state.items.filter(it => it.cb && it.cb === digits);
+    if (exact.length === 1) { sres.hidden = true; openFiche(exact[0]); return true; }
+    if (state.results && state.results.length === 1) { sres.hidden = true; openFiche(state.results[0]); return true; }
+    toast(state.results && state.results.length ? `${state.results.length} exemplaires correspondent : choisissez dans la liste.` : `Code ${qIn.value} introuvable dans cette extraction.`);
+    qIn.focus();
+    return false;
+  };
+
+  // ---------- fiche d'un exemplaire ----------
+  const fiche = $('#fiche');
+  function openFiche(it) {
+    if (!it) return;
+    sres.hidden = true;
+    state.ficheDirty = false;
+    const secs = [];
+    for (const p of allPistes()) {
+      const r = p.kind === 'series' ? p.rows.find(x => x.serie.items.includes(it)) : p.rows.find(x => x.it === it);
+      if (r) secs.push({ p, r, k: SF.decKey(p.id, r) });
+    }
+    const rk = SF.decKey('rayon', { it }), rc = SF.dec.get(rk);
+    const fact = (l, v) => (v == null || v === '' ? '' : `<div><dt>${l}</dt><dd>${esc(v)}</dd></div>`);
+    $('#ficheBody').innerHTML = `
+      <div class="f-head">
+        <div><p class="f-cote">${esc(it.cote)} · ${esc(it.fonds)}</p><h2>${esc(it.titre)}</h2>
+        <p class="muted">${it.serie ? esc(it.serie) + (it.tome != null ? ' · t. ' + it.tome : '') : ''}${it.serie && it.auteur ? ' — ' : ''}${esc((it.auteur || '').split(/[,;]/)[0])}</p></div>
+        <button class="iconbtn f-close" type="button" aria-label="Fermer la fiche">✕</button>
+      </div>
+      <dl class="facts">
+        ${fact('Code-barres', it.cb)}${fact('Statut', (it.statut || '').replace(/\s*\([A-Z]+\)$/, ''))}${fact('Dernier prêt', it.dernier ? F.date(it.dernier) : 'aucun connu')}
+        ${fact('Prêts de l\'année', it.pa)}${fact('Prêts au total', it.pv)}${fact('Publication', it.pub)}${fact('Entrée', it.crea ? F.date(it.crea) : '')}
+      </dl>
+      ${secs.length ? '<h3 class="f-h">Repéré dans les listes</h3>' + secs.map(s => `<section class="f-sec ${s.p.tone}"><p><strong>${esc(s.p.group)}</strong> ${esc(s.p.title)}<br><span>${esc(s.r.motif)}</span>${s.r.note ? `<br><small class="muted">${esc(s.r.note)}</small>` : ''}</p>${decGroup(s.p.id, s.k)}</section>`).join('')
+        : '<p class="muted f-none">Cet exemplaire n\'apparaît dans aucune liste avec les seuils actuels.</p>'}
+      <h3 class="f-h">Constat en rayon</h3>
+      ${decGroup('rayon', rk, true)}
+      <label class="f-note">Note libre <textarea data-k="${esc(rk)}" rows="3" placeholder="Ex. : dos décollé, pages tachées, à montrer à l'équipe…">${esc(rc ? rc.com : '')}</textarea></label>
+      <p class="f-save muted">Enregistré au fur et à mesure. Retrouvé dans l'export Excel, onglet « Notes de rayon ».</p>`;
+    fiche.querySelector('.f-close').addEventListener('click', () => fiche.close());
+    let t;
+    fiche.querySelector('textarea').addEventListener('input', e => {
+      clearTimeout(t);
+      t = setTimeout(() => { SF.dec.setCom(e.target.dataset.k, e.target.value); state.ficheDirty = true; }, 300);
+    });
+    if (!fiche.open) fiche.showModal();
+    fiche.scrollTop = 0;
+  }
+  SF.openFiche = openFiche;
+  fiche.addEventListener('click', e => { if (e.target === fiche) fiche.close(); }); // clic sur le fond
+  fiche.addEventListener('close', () => {
+    const ta = fiche.querySelector('textarea');
+    if (ta) { // dernière frappe, si elle n'a pas encore été enregistrée
+      const cur = SF.dec.get(ta.dataset.k);
+      if ((cur ? cur.com : '') !== ta.value.trim()) { SF.dec.setCom(ta.dataset.k, ta.value); state.ficheDirty = true; }
+    }
+    if (state.ficheDirty) { const y = window.scrollY; render(); window.scrollTo(0, y); }
+  });
+  SF.toast = msg => toast(msg);
 
   // ---------- infobulles ----------
   let tip;

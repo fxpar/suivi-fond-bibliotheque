@@ -11,7 +11,8 @@ window.SF = window.SF || {};
     usure: 'Remplacer - usure',
     demande: 'Renforcer - demande',
     series: 'Séries à compléter',
-    regul: 'À régulariser'
+    regul: 'À régulariser',
+    rayon: 'Notes de rayon'
   };
 
   // Choix proposés selon la liste (le premier est « on ne touche à rien »)
@@ -21,7 +22,9 @@ window.SF = window.SF || {};
     usure: ['État correct', 'Réparer', 'Remplacer', 'Retirer'],
     demande: ['Non', 'Commander'],
     series: ['Ne pas compléter', 'Commander'],
-    regul: ['À faire', 'Fait']
+    regul: ['À faire', 'Fait'],
+    // fiche d'un exemplaire trouvé en rayon : toutes les catégories
+    rayon: ['Garder', 'Mettre en avant', 'Transférer', 'Réparer', 'Remplacer', 'Retirer', 'Commander']
   };
 
   const today = () => {
@@ -44,10 +47,22 @@ window.SF = window.SF || {};
 
   SF.dec = {
     get: k => store[k] || null,
-    set(k, d, com) {
-      if (!d) { delete store[k]; } else { store[k] = { d, date: today(), com: com != null ? com : (store[k] && store[k].com) || '' }; }
+    set(k, d) {
+      const com = (store[k] && store[k].com) || '';
+      if (!d && !com) delete store[k];
+      else store[k] = { d: d || '', date: today(), com };
       save();
     },
+    /** note libre, conservée même sans décision */
+    setCom(k, com) {
+      const d = (store[k] && store[k].d) || '';
+      com = (com || '').trim();
+      if (!d && !com) delete store[k];
+      else store[k] = { d, date: today(), com };
+      save();
+    },
+    /** une ligne est « décidée » quand un choix est fait (une simple note ne suffit pas) */
+    isDone: k => !!(store[k] && store[k].d),
     count: () => Object.keys(store).length,
     clear() { store = {}; save(); },
     /** fusionne des décisions importées : la plus récente l'emporte, l'import gagne à date égale */
@@ -92,7 +107,7 @@ window.SF = window.SF || {};
         let key;
         if (pid === 'series') key = SF.decKey('series', { serie: { fonds: r[iF] || '', nom: r[iS] || '' } });
         else key = SF.decKey(pid, { it: { cb: r[iCB] != null ? String(r[iCB]).trim() : '', cote: r[iCote] || '', titre: r[iT] || '' } });
-        entries.push({ key, d: d || 'À revoir', com, date: date || today() });
+        entries.push({ key, d, com, date: date || today() });
       }
     }
     return entries;
