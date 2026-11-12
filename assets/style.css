@@ -362,3 +362,7 @@ a.iconbtn { text-decoration: none; }
 .drop-hint a:hover { text-decoration: none; }
 .drawer-foot a.btn { text-align: center; text-decoration: none; }
 @media (max-width: 720px) { #btnTour { display: none; } }
+
+/* retour au fichier en cours */
+.backbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 14px; font-size: .9rem; }
+.backbar #backName { font-weight: 700; overflow-wrap: anywhere; }

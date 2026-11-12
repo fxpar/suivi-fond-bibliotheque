@@ -17,13 +17,26 @@
   drop.addEventListener('drop', ev => ev.dataTransfer.files.length && load([...ev.dataTransfer.files]));
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length && !$('#results').hidden) load([...e.dataTransfer.files]); });
+  /** Retour à l'écran de dépôt. Le fichier en cours reste en mémoire tant qu'on n'en dépose pas un autre. */
   function reset() {
-    Object.assign(state, { items: [], sheets: [], files: [], ctx: null, fonds: ALL, open: null, allP: null });
     input.value = '';
     $('#results').hidden = true; $('#dropSection').hidden = false;
     $('#btnReset').hidden = true; $('#btnMenu').hidden = true;
+    const bar = $('#backBar');
+    if (state.items.length) {
+      const names = state.files.length ? state.files.join(', ') : 'au fichier en cours';
+      $('#backName').textContent = state.files.length ? `« ${names} »` : names;
+      bar.hidden = false;
+    } else bar.hidden = true;
     closeDrawer();
+    window.scrollTo(0, 0);
   }
+  function showResultsView() {
+    $('#dropSection').hidden = true; $('#results').hidden = false; $('#backBar').hidden = true;
+    $('#btnReset').hidden = false; $('#btnMenu').hidden = false;
+    $('#loadError').hidden = true;
+  }
+  $('#btnBack').addEventListener('click', () => { showResultsView(); window.scrollTo(0, 0); });
   // Avant de changer de fichier : proposer de télécharger la sauvegarde
   SF.computedAll = () => { const f = state.fonds; state.fonds = ALL; try { return SF.computed(); } finally { state.fonds = f; } };
   async function askReset() {
@@ -95,7 +108,7 @@
       const nDec = decs.length ? SF.dec.merge(decs) : 0;
       const msg = [nDec && `${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'}`, nPh && `${F.int(nPh)} ${F.plural(nPh, 'photo')} ${nPh > 1 ? 'reprises' : 'reprise'}`].filter(Boolean).join(', ');
       if (!items.length) {
-        if ((decs.length || nPh) && state.items.length) { render(); toast(msg ? `${msg} depuis la sauvegarde.` : 'Rien de nouveau dans cette sauvegarde.'); return; }
+        if ((decs.length || nPh) && state.items.length) { render(); showResultsView(); toast(msg ? `${msg} depuis la sauvegarde.` : 'Rien de nouveau dans cette sauvegarde.'); return; }
         if (decs.length || nPh) throw new Error(`Sauvegarde lue (${msg || 'rien de nouveau'}). Déposez maintenant l'extraction du fonds pour les retrouver.`);
         throw new Error('Aucune ligne exploitable trouvée. Vérifiez que la feuille contient bien des en-têtes comme « Cote », « Titre », « Dernier emprunt », « Nb prêts année »…');
       }
@@ -103,8 +116,7 @@
       // texte de recherche pré-calculé (titre, série, auteur)
       for (const it of items) it._s = SF.norm(`${it.titre} ${it.serie} ${it.tome ?? ""} ${it.auteur}`);
       Object.assign(state, { items, sheets, files: files.map(f => f.name), ctx: SF.context(items), fonds: ALL, open: null, allP: null });
-      $('#dropSection').hidden = true; $('#results').hidden = false;
-      $('#btnReset').hidden = false; $('#btnMenu').hidden = false;
+      showResultsView();
       render();
       window.scrollTo(0, 0);
     } catch (e) {

@@ -39,6 +39,10 @@
 <main class="wrap">
   <!-- Dépôt -->
   <section id="dropSection">
+    <p class="backbar" id="backBar" hidden>
+      <button class="btn ghost" id="btnBack" type="button">← Revenir à <span id="backName"></span></button>
+      <span class="muted">ou déposez un autre fichier ci-dessous.</span>
+    </p>
     <label class="drop" id="drop" for="fileInput">
       <input type="file" id="fileInput" accept=".xlsx,.xls,.ods,.csv,.zip" multiple>
       <span class="drop-icon" aria-hidden="true">
