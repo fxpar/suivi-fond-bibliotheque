@@ -9,6 +9,46 @@
   var KEY = 'suivi-fonds-prenom';
   var esc = MLS.util.escapeHtml;
 
+  /* ------------------------------------------------ textes de l'interface (tutoiement)
+     Le lecteur MicroLearn vouvoie et parle de « module » : ici, c'est une visite entre collègues. */
+  MLS.i18n.add('fr', {
+    'p.moduleEyebrow': 'Visite guidée',
+    'p.slidesCount': '{n} étapes',
+    'p.slide': 'Étape {n}',
+    'p.slideOf': 'Étape {n} sur {total}',
+    'p.chooseCast': 'Choisis tes guides',
+    'p.chooseCastHint': 'Ils t’accompagnent tout au long de la visite. Tu pourras les changer à tout moment avec le bouton <i class="bi bi-people"></i>.',
+    'p.castAudio': 'Guides et lecture audio',
+    'p.start': 'Commencer la visite',
+    'p.restart': 'Recommencer',
+    'p.resume': 'Reprendre (étape {n})',
+    'p.endTitle': 'Visite terminée !',
+    'p.endPerfect': 'Parfait, toutes tes réponses sont justes.',
+    'p.endGood': 'Bien joué ! Tu peux revoir les points manqués.',
+    'p.endLow': 'Tu peux revoir la visite pour consolider tout ça.',
+    'p.endThanks': 'Merci d’avoir suivi la visite. À toi de jouer !',
+    'p.review': 'Revoir la visite',
+    'p.upNext': 'Et maintenant ?',
+    'p.goNext': 'Ouvrir l’outil',
+    'p.nextNoLink': 'Ouvre l’outil depuis sa page d’accueil.',
+    'p.backToLms': 'Ouvre l’outil depuis sa page d’accueil.',
+    'dg.hint': 'Clique sur chaque partie pour la découvrir.',
+    'dg.hintPuzzle': 'Reconstitue le puzzle : clique sur chaque pièce pour la mettre en place.',
+    'a.hint': 'Pour écouter les textes un peu longs plutôt que de les lire. Cet outil de confort ne remplace pas ton lecteur d’écran et n’interfère pas avec lui.',
+    'a.hint.click': 'Une icône <i class="bi bi-volume-up-fill"></i> apparaît à côté des textes longs : touche-la pour les écouter.',
+    'a.hint.interact': 'Icônes, et lecture quand tu ouvres un élément : carte, étape, onglet, réplique, correction de quiz…',
+    'a.hint.auto': 'Les textes longs et les dialogues sont lus dès l’affichage de chaque étape, ainsi que les éléments que tu ouvres.',
+    'a.mode.interact': 'Quand j’ouvre un élément',
+    'a.groupMine': 'Langue de la visite',
+    'a.testNarrator': 'Bonjour ! Voici la voix qui lira les textes de cette visite.',
+    'a.testRole': 'Salut, je suis {name}, {label}.'
+  });
+  // Consignes des formats intégrés, au tutoiement
+  (function () {
+    var f = MLS.formats.builtin('format-flashcards');
+    if (f && f.i18n && f.i18n.fr) { f.i18n.fr.hint = 'Touche une carte pour la retourner'; MLS.formats.register(f); }
+  })();
+
   function getName() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
   function setName(n) { try { localStorage.setItem(KEY, n); } catch (e) { /* navigation privée */ } }
 
@@ -190,6 +230,9 @@
       catalog: window.MLS_CHARACTERS
     });
     window.mlsPlayer = player;
+    // Une visite n'est pas un examen : pas de note à l'écran de fin, juste un mot d'au revoir
+    var openEnd = player.openEnd;
+    player.openEnd = function () { this.gradable = {}; this.scores = {}; return openEnd.apply(this, arguments); };
     player.load(md, { welcome: true });
     applyName(getName());
     document.getElementById('loading').hidden = true;

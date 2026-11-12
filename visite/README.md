@@ -1,6 +1,6 @@
 # Visite guidée
 
-Diaporama qui présente l'outil pas à pas, joué par le moteur **MicroLearn** (https://github.com/edu-fpar/micro-learning-app), copié tel quel dans ce dossier (version 1.0.0, commit `3db88cc`).
+Diaporama qui présente l'outil pas à pas, joué par le moteur **MicroLearn** (https://github.com/edu-fpar/micro-learning-app), copié dans ce dossier (version 1.0.0, commit `3db88cc`). Cette copie est désormais un module à part entière : on peut la modifier librement.
 
 ## Modifier la visite
 
@@ -11,6 +11,12 @@ Pour la faire modifier par une IA :
 > Lis https://edu-fpar.github.io/micro-learning-app/docs/skill.md, puis modifie ce fichier `visite.md` : … (en gardant les formats `format-prenom` et `format-sms` décrits ci-dessous).
 
 ## Ce qui est propre à la visite (`visite.js`)
+
+**Textes de l'interface** : le lecteur passe au tutoiement et parle de « visite » et d'« étapes » (accueil « Choisis tes guides », écran de fin « Visite terminée ! », bouton « Ouvrir l'outil »…). Tous ces textes sont regroupés en tête de `visite.js` (`MLS.i18n.add('fr', …)`).
+
+**Écran de fin sans note** : le quiz reste interactif, mais l'écran de fin n'affiche pas de score.
+
+**Couleurs** : celles de l'outil, dans le `<style>` de `index.html`.
 
 **`format-prenom`** : le personnage pose une question (une citation `>`), l'utilisateur tape son prénom (facultatif, gardé dans le navigateur).
 
@@ -27,4 +33,4 @@ Préférez la forme `{, prenom}` : la phrase reste juste si la personne ne donne
 
 ## Mettre à jour le moteur
 
-Recopier depuis le dépôt MicroLearn : `js/core/`, `js/formats/`, `css/player.css`, `assets/characters/`, `vendor/marked/`, `vendor/bootstrap-icons/` et `vendor/bootstrap/css/bootstrap.min.css`. Ne pas toucher à `visite.js` ni à `visite.md`.
+Recopier depuis le dépôt MicroLearn : `js/core/`, `js/formats/`, `css/player.css`, `assets/characters/`, `vendor/marked/`, `vendor/bootstrap-icons/` et `vendor/bootstrap/css/bootstrap.min.css`. Ne pas toucher à `visite.js`, `visite.md` ni `index.html` : les adaptations de la visite y sont regroupées.
