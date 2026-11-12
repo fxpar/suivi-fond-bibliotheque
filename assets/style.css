@@ -355,3 +355,10 @@ tr.prio.done td { background: var(--surface-2); }
 .scan-tip { margin: -4px 0 12px; font-size: .82rem; color: var(--muted); }
 .btnrow.center { justify-content: center; }
 .scan-frame { left: 3%; right: 3%; top: 30%; bottom: 30%; }
+
+/* ---------- visite guidée ---------- */
+a.iconbtn { text-decoration: none; }
+.drop-hint a { color: var(--accent-strong); font-weight: 600; }
+.drop-hint a:hover { text-decoration: none; }
+.drawer-foot a.btn { text-align: center; text-decoration: none; }
+@media (max-width: 720px) { #btnTour { display: none; } }

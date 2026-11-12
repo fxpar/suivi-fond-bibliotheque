@@ -7,6 +7,10 @@ Outil web pour analyser une extraction de fonds de bibliothèque (export SIGB en
 - **une recherche d'exemplaire** (code-barres, cote ou titre), avec lecture du code-barres par la caméra sur téléphone : la fiche montre les listes où l'exemplaire apparaît et permet de noter un constat en rayon ;
 - **trois exports** : un classeur Excel prêt à annoter en rayon (une feuille par piste, triée par cote, colonne *Décision* à liste déroulante), une synthèse de 6 pages au plus pour la direction (PowerPoint ou PDF), un résumé texte à coller dans un assistant IA si on le souhaite.
 
+## Visite guidée
+
+Le dossier `visite/` contient une visite guidée de l'outil (bouton « ? » du bandeau, lien sur la page d'accueil), jouée par le moteur MicroLearn. Le texte est dans `visite/visite.md`, facile à modifier à la main ou par une IA : voir [visite/README.md](visite/README.md).
+
 ## Décisions de l'équipe
 
 Chaque ligne des listes propose des choix adaptés à la piste (garder, mettre en avant, transférer, retirer ; réparer, remplacer ; commander…).

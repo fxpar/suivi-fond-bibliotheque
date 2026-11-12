@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visite guidée · Suivi de fonds</title>
+  <meta name="description" content="Visite guidée de l'outil Suivi de fonds, pas à pas, comme avec un ou une collègue.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='6' width='5' height='20' rx='1' fill='%23234e62'/%3E%3Crect x='11' y='4' width='5' height='22' rx='1' fill='%23487d96'/%3E%3Crect x='18' y='9' width='5' height='17' rx='1' fill='%237fa8bb'/%3E%3Crect x='24' y='8' width='4' height='18' rx='1' transform='rotate(12 26 17)' fill='%23d9b600'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/bootstrap/css/bootstrap.min.css">
+  <link rel="stylesheet" href="vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="css/player.css">
+  <style>
+    #loading { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #4a5359; }
+    #loading[hidden] { display: none; }
+  </style>
+</head>
+<body class="mls-body">
+  <div id="loading" role="status"><div class="spinner-border text-secondary" aria-hidden="true"></div></div>
+  <div id="player"></div>
+  <noscript><p style="padding:2rem;font-family:sans-serif">La visite guidée nécessite JavaScript.</p></noscript>
+
+  <!-- Moteur MicroLearn (copie de https://github.com/edu-fpar/micro-learning-app, voir README.md) -->
+  <script src="vendor/marked/marked.min.js"></script>
+  <script src="js/core/mls.js"></script>
+  <script src="js/core/i18n.js"></script>
+  <script src="js/core/yaml.js"></script>
+  <script src="js/core/template.js"></script>
+  <script src="js/core/parser.js"></script>
+  <script src="js/core/scorm.js"></script>
+  <script src="js/core/speech.js"></script>
+  <script src="js/core/diagram.js"></script>
+  <script src="js/core/player.js"></script>
+  <script src="js/core/formats.js"></script>
+  <script src="js/formats/title.js"></script>
+  <script src="js/formats/content.js"></script>
+  <script src="js/formats/dialogue.js"></script>
+  <script src="js/formats/conseil.js"></script>
+  <script src="js/formats/quiz.js"></script>
+  <script src="js/formats/flashcards.js"></script>
+  <script src="js/formats/timeline.js"></script>
+  <script src="js/formats/hotspots.js"></script>
+  <script src="js/formats/tabs.js"></script>
+  <script src="js/formats/diagrams.js"></script>
+  <script src="assets/characters/catalog.js"></script>
+  <!-- Propre à la visite : formats « prénom » et « SMS », lancement -->
+  <script src="visite.js"></script>
+</body>
+</html>
