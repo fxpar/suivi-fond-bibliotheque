@@ -1,0 +1,6 @@
+# Ne jamais publier de données de bibliothèque dans le dépôt
+*.xlsx
+*.xls
+*.ods
+*.csv
+.claude/
