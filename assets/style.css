@@ -441,3 +441,16 @@ ul.why li { margin: 1px 0; }
 
 .tab .sm { display: none; }
 @media (max-width: 720px) { .tab .lg { display: none; } .tab .sm { display: inline; } .tab { padding: 10px 8px; font-size: .92rem; } .tabs { gap: 0; } }
+
+/* ---------- navigation collante dans « À examiner » ---------- */
+.jump { position: sticky; top: 0; z-index: 15; display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none;
+  margin: 0 -16px 12px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.jump::-webkit-scrollbar { display: none; }
+.jump-t { font-size: .8rem; font-weight: 700; color: var(--muted); white-space: nowrap; margin-right: 2px; }
+.jchip { flex: none; border: 1px solid var(--line); background: var(--surface); padding: 5px 10px; border-radius: 999px; cursor: pointer; font-size: .85rem; white-space: nowrap; }
+.jchip span { color: var(--muted); margin-left: 3px; font-variant-numeric: tabular-nums; }
+.jchip:hover { border-color: var(--accent); }
+.jchip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.jchip.on span { color: inherit; opacity: .75; }
+.jchip:disabled { opacity: .45; cursor: default; }
+.prio-card > .btn { margin-top: 4px; }

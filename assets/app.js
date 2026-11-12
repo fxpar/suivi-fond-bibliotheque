@@ -296,7 +296,7 @@
       ${sel('demande', 'Forte demande dès', [6, 8, 10, 12, 15], 'prêts/an')}
     </div>
     <p class="disclaimer">Ce sont des <strong>pistes à vérifier en rayon</strong>, pas des décisions. L'outil ne voit ni l'état des documents, ni leur intérêt patrimonial, ni vos choix de politique documentaire. Notez vos choix ligne par ligne : ils sont repris dans l'export Excel, qui sert de sauvegarde.</p>`;
-    h += renderPriorites(c);
+    h = jumpBar(c) + h + renderPriorites(c);
     h += '<h2 class="gh gh-all">Toutes les pistes, critère par critère</h2><p class="disclaimer">Chaque liste correspond à un seul critère : utile pour un passage systématique, ou pour vérifier un cas.</p>';
     const groups = [...new Set(c.pistes.filter(p => p.id !== 'prio').map(p => p.group))];
     for (const g of groups) {
@@ -305,7 +305,7 @@
       for (const p of ps) {
         const open = state.open === p.id;
         const nd = doneCount(p);
-        h += `<article class="pcard ${p.tone}${open ? ' open' : ''}${p.rows.length ? '' : ' empty'}">
+        h += `<article class="pcard ${p.tone}${open ? ' open' : ''}${p.rows.length ? '' : ' empty'}" data-anchor="${p.id}">
           <div class="pc-head">
             <span class="pc-n">${F.int(p.rows.length)}</span>
             <div><h3>${esc(p.title)}</h3><p>${esc(p.why)}</p></div>
@@ -321,12 +321,39 @@
     const box = $('#tab-review');
     box.innerHTML = h;
     box.querySelectorAll('select[data-opt]').forEach(s => s.addEventListener('change', () => { state.opts[s.dataset.opt] = +s.value; render(); }));
+    box.querySelector('[data-prio-toggle]')?.addEventListener('click', () => { state.prioOpen = !state.prioOpen; state.shown = 100; renderReview(SF.computed()); });
+    box.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => jumpTo(b.dataset.jump)));
     box.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
       state.open = state.open === b.dataset.open ? null : b.dataset.open; state.shown = 100; renderReview(SF.computed());
       if (state.open) document.querySelector('.plist')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }));
     box.querySelectorAll('[data-more]').forEach(b => b.addEventListener('click', () => { state.shown += 200; renderReview(SF.computed()); }));
     box.querySelectorAll('[data-hide]').forEach(b => b.addEventListener('change', e => { state.hideDone = e.target.checked; renderReview(SF.computed()); }));
+  }
+
+  // ---------- navigation dans « À examiner » : toujours visible, ouvre la liste choisie ----------
+  const JUMP = [['prio', 'Liste ciblée'], ['dormants', 'Sans prêt'], ['doublons', 'Doublons'], ['usure', 'Usure'], ['demande', 'Forte demande'], ['series', 'Tomes manquants'], ['regul', 'À régulariser']];
+  function jumpBar(c) {
+    return `<nav class="jump" aria-label="Aller à une liste"><span class="jump-t">Aller à</span>${JUMP.map(([id, l]) => {
+      const p = c.pistes.find(x => x.id === id);
+      const n = p ? p.rows.length : 0;
+      const on = id === 'prio' ? state.prioOpen : state.open === id;
+      return `<button type="button" class="jchip${on ? ' on' : ''}" data-jump="${id}"${n ? '' : ' disabled'}>${l} <span>${F.int(n)}</span></button>`;
+    }).join('')}</nav>`;
+  }
+  function jumpTo(id) {
+    // une seule grande liste ouverte à la fois : la page reste courte
+    if (id === 'prio') { state.prioOpen = true; state.open = null; } else { state.open = id; state.prioOpen = false; }
+    state.shown = 100;
+    renderReview(SF.computed());
+    const bar = $('#tab-review .jump');
+    const chip = bar && bar.querySelector('.jchip.on');
+    if (chip) bar.scrollLeft = chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2;
+    const el = $('#tab-review').querySelector(`[data-anchor="${id}"]`);
+    if (el) {
+      const y = el.getBoundingClientRect().top + window.scrollY - (bar ? bar.offsetHeight : 0) - 12;
+      window.scrollTo({ top: y, behavior: 'smooth' });
+    }
   }
 
   // ---------- liste ciblée (onglet « À examiner ») ----------
@@ -342,7 +369,7 @@
       ? `Politique des rayons appliquée : ${[kept.length && `${kept.length} à conserver`, blocs.length && `${blocs.length} à repenser en bloc`].filter(Boolean).join(', ')}.`
       : 'Aucune politique de rayon n’est encore définie : tous les rayons sont examinés exemplaire par exemplaire.';
     return `<h2 class="gh">Liste ciblée</h2>
-      <div class="card prio-card">
+      <div class="card prio-card" data-anchor="prio">
         <h3>${F.int(p.rows.length)} ${F.plural(p.rows.length, 'exemplaire')} à examiner en priorité</h3>
         <p class="sub">Ils cumulent plusieurs signaux, et chacun est comparé à <strong>son propre rayon</strong> : un document qui dort dans un rayon qui dort n'y figure que s'il est nettement plus faible que ses voisins.</p>
         <p class="pc-c">${politique} <button type="button" class="linklike" data-goto="rayons">Régler la politique des rayons</button></p>
@@ -352,7 +379,8 @@
         </details>
         ${exParts.length ? `<p class="pc-c">Écartés selon vos choix : ${exParts.join(', ')}.</p>` : ''}
         ${blocs.length ? `<ul class="blocs">${blocs.map(s => `<li><strong>Rayon « ${esc(s.seg)} »</strong>${multi ? ` (${esc(s.fonds)})` : ''} : ${F.int(s.n)} documents dont ${F.int(s.dorm)} en sommeil, à décider en bloc.</li>`).join('')}</ul>` : ''}
-        ${p.rows.length ? `<div class="plist" data-plist="prio">${listTable(p)}</div>` : '<p class="pc-c">Aucun exemplaire ne cumule assez de signaux avec ces réglages.</p>'}
+        ${p.rows.length ? `<button class="btn small" type="button" data-prio-toggle aria-expanded="${!!state.prioOpen}">${state.prioOpen ? 'Masquer la liste' : 'Voir la liste'} (${F.int(p.rows.length)})</button>` : '<p class="pc-c">Aucun exemplaire ne cumule assez de signaux avec ces réglages.</p>'}
+        ${p.rows.length && state.prioOpen ? `<div class="plist" data-plist="prio">${listTable(p)}</div>` : ''}
       </div>`;
   }
 
