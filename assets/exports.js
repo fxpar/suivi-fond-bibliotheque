@@ -8,7 +8,8 @@ window.SF = window.SF || {};
   const LIBS = {
     exceljs: 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js',
     pptx: 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js',
-    jspdf: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+    jspdf: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    jszip: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
   };
   const loaded = {};
   function loadScript(url) {
@@ -35,7 +36,7 @@ window.SF = window.SF || {};
   const C = { ink: '1F2933', blue: '487D96', blueL: 'E4EEF2', amber: 'FBF3CC', grey: 'F3F2EE', line: 'D9D7D0' };
 
   // ================= EXCEL =================
-  SF.exportXlsx = async function (c) {
+  SF.buildXlsx = async function (c, photoMap) {
     await loadScript(LIBS.exceljs);
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Suivi de fonds';
@@ -160,7 +161,9 @@ window.SF = window.SF || {};
     }
 
     // --- Notes de rayon (constats saisis depuis la fiche d'un exemplaire) ---
-    const notes = c.items.map(it => ({ it, d: SF.dec.get(SF.decKey('rayon', { it })) })).filter(x => x.d);
+    // photoMap (export ZIP) : clé d'exemplaire -> noms des fichiers photo, pour des liens cliquables
+    const pm = photoMap || new Map();
+    const notes = c.items.map(it => { const k = SF.decKey('rayon', { it }); return { it, d: SF.dec.get(k), ph: pm.get(k) || [] }; }).filter(x => x.d || x.ph.length);
     if (notes.length) {
       const ws = wb.addWorksheet(SHEETS.rayon, {
         views: [{ state: 'frozen', ySplit: 1 }],
@@ -175,13 +178,23 @@ window.SF = window.SF || {};
         { header: 'Décision', key: 'dec', width: 16 }, { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
         { header: 'Commentaire', key: 'com', width: 40 }
       ];
+      const nph = Math.min(3, Math.max(0, ...notes.map(x => x.ph.length)));
+      for (let i = 1; i <= nph; i++) cols.push({ header: `Photo ${i}`, key: 'ph' + i, width: 11 });
+      if (notes.some(x => x.ph.length > 3)) cols.push({ header: 'Autres photos', key: 'phx', width: 40 });
       ws.columns = cols;
       notes.sort((a, b) => cmp(a.it.fonds, b.it.fonds) || cmp(a.it.cote, b.it.cote) || cmp(a.it.titre, b.it.titre));
-      for (const { it } of notes) {
-        ws.addRow({
+      for (const { it, ph } of notes) {
+        const row = ws.addRow({
           fonds: it.fonds, cote: it.cote, titre: it.titre, serie: it.serie, tome: it.tome, auteur: it.auteur.split(/[,;]\s*(?=[A-ZÀ-Ý])/)[0],
           cb: it.cb, statut: it.statut.replace(/\s*\([A-Z]+\)$/, ''), dernier: utc(it.dernier), pa: it.pa, pv: it.pv,
-          ...decOf({ id: 'rayon' }, { it })
+          ...decOf({ id: 'rayon' }, { it }),
+          phx: ph.length > 3 ? ph.slice(3).join(' ; ') : null
+        });
+        // liens relatifs : ils fonctionnent une fois le ZIP décompressé (classeur et dossier photos côte à côte)
+        ph.slice(0, 3).forEach((name, i) => {
+          const cell = row.getCell('ph' + (i + 1));
+          cell.value = { text: `Voir ${i + 1}`, hyperlink: 'photos/' + name, tooltip: name };
+          cell.font = { color: { argb: 'FF' + C.blue }, underline: true };
         });
       }
       styleHeader(ws);
@@ -191,11 +204,73 @@ window.SF = window.SF || {};
         ws.getRow(i).alignment = { vertical: 'top', wrapText: true };
       }
       ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
-      line([SHEETS.rayon, notes.length, 'Constats notés depuis la fiche d\'un exemplaire (recherche ou scan en rayon).']);
+      line([SHEETS.rayon, notes.length, 'Constats notés depuis la fiche d\'un exemplaire (recherche ou scan en rayon).' + (pm.size ? ' Les liens « Voir » ouvrent les photos du dossier « photos » : décompressez le ZIP avant d\'ouvrir le classeur.' : '')]);
     }
 
-    const buf = await wb.xlsx.writeBuffer();
-    SF.download(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `pistes-${slug(c.label)}-${stamp(c.ctx.ref)}.xlsx`);
+    return wb.xlsx.writeBuffer();
+  };
+
+  const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  SF.xlsxName = c => `pistes-${slug(c.label)}-${stamp(c.ctx.ref)}.xlsx`;
+  SF.exportXlsx = async function (c) {
+    SF.download(new Blob([await SF.buildXlsx(c)], { type: XLSX_MIME }), SF.xlsxName(c));
+  };
+
+  /** Sauvegarde complète : classeur + dossier photos + manifeste (pour le réimport) */
+  SF.exportZip = async function (c) {
+    await Promise.all([loadScript(LIBS.jszip), loadScript(LIBS.exceljs)]);
+    const recs = await SF.photos.all();
+    const byK = new Map();
+    for (const r of recs) { if (!byK.has(r.k)) byK.set(r.k, []); byK.get(r.k).push(r); }
+    const zip = new JSZip();
+    const folder = zip.folder('photos');
+    const photoMap = new Map(), manifest = [];
+    for (const it of c.items) {
+      const k = SF.decKey('rayon', { it });
+      const list = (byK.get(k) || []).sort((a, b) => cmp(a.date, b.date) || a.id - b.id);
+      if (!list.length) continue;
+      const names = list.map((r, i) => SF.photoName(it, r.date, i + 1));
+      photoMap.set(k, names);
+      list.forEach((r, i) => { folder.file(names[i], r.blob, { binary: true }); manifest.push({ file: 'photos/' + names[i], k, date: r.date, uid: r.uid }); });
+    }
+    zip.file(SF.xlsxName(c), await SF.buildXlsx(c, photoMap));
+    zip.file('photos.json', JSON.stringify({ outil: 'Suivi de fonds', version: 1, photos: manifest }, null, 1));
+    zip.file('LISEZ-MOI.txt', [
+      'Sauvegarde Suivi de fonds',
+      '',
+      '1. Décompressez ce fichier (clic droit > Extraire tout).',
+      '2. Ouvrez le classeur : l\'onglet « Notes de rayon » contient des liens « Voir » vers les photos.',
+      '3. Les photos sont nommées : cote - titre - code-barres - date - numéro.jpg',
+      '4. Pour tout retrouver dans l\'outil, redéposez ce ZIP (tel quel) avec l\'extraction du fonds.'
+    ].join('\r\n'));
+    const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/zip', compression: 'STORE' });
+    SF.download(blob, `sauvegarde-${slug(c.label)}-${stamp(new Date())}.zip`);
+    return manifest.length;
+  };
+
+  /** Lit un ZIP de sauvegarde : décisions du classeur + photos */
+  SF.readBackupZip = async function (file) {
+    await loadScript(LIBS.jszip);
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    let decisions = [], photos = 0;
+    const x = Object.values(zip.files).find(f => /\.xlsx$/i.test(f.name) && !f.dir);
+    if (x) {
+      const wb = XLSX.read(await x.async('arraybuffer'), { type: 'array', cellDates: true });
+      if (SF.isDecisionBook(wb)) decisions = SF.readDecisionBook(wb);
+    }
+    const man = zip.file('photos.json');
+    if (man) {
+      const m = JSON.parse(await man.async('string'));
+      for (const p of m.photos || []) {
+        if (p.uid && await SF.photos.hasUid(p.uid)) continue; // déjà présente
+        const f = zip.file(p.file);
+        if (!f) continue;
+        await SF.photos.add(p.k, await f.async('blob'), { raw: true, date: p.date, uid: p.uid });
+        photos++;
+      }
+    }
+    if (!x && !man) throw new Error(`« ${file.name} » n'est pas une sauvegarde de l'outil.`);
+    return { items: [], sheets: [], decisions, photos };
   };
 
   const decOf = (p, r) => {

@@ -16,14 +16,25 @@ Chaque ligne des listes propose des choix adaptés à la piste (garder, mettre e
 - Redéposer ce classeur, seul ou avec une nouvelle extraction, restitue les décisions. À la prochaine extraction, les titres déjà examinés apparaissent comme tels. La décision la plus récente l'emporte.
 - Les lignes sont reconnues par le code-barres (à défaut cote + titre), et les séries par fonds + nom de série.
 - Les constats notés depuis la fiche d'un exemplaire vont dans l'onglet *Notes de rayon* du classeur.
+- Avant « Nouveau fichier », l'outil propose de télécharger la sauvegarde s'il y a des décisions ou des photos.
+
+## Photos
+
+Depuis la fiche d'un exemplaire, « Ajouter une photo » ouvre l'appareil photo (ou le sélecteur de fichiers sur ordinateur). Les photos sont réduites à 1600 px (JPEG, environ 200 à 400 Ko) et gardées dans le navigateur (IndexedDB).
+
+La **sauvegarde complète** est un ZIP qui contient :
+
+- le classeur Excel, dont l'onglet *Notes de rayon* a des liens « Voir 1, Voir 2… » vers chaque photo (ils fonctionnent une fois le ZIP décompressé) ;
+- un dossier `photos/` avec des noms lisibles : `cote - titre - code-barres - date - n°.jpg` ;
+- `photos.json`, qui permet de redéposer le ZIP tel quel dans l'outil pour tout retrouver, sans doublon.
 
 ## Lecture du code-barres
 
-Sur téléphone ou tablette, le bouton à droite de la recherche ouvre la caméra arrière. Le navigateur utilise son lecteur natif quand il existe (Chrome sur Android), sinon la bibliothèque ZXing, chargée à la demande (iPhone). L'image n'est ni enregistrée ni envoyée. La caméra n'est accessible qu'en HTTPS : c'est le cas sur GitHub Pages.
+Sur téléphone ou tablette, le bouton à droite de la recherche ouvre la caméra arrière. Deux lecteurs travaillent en parallèle : le lecteur natif du navigateur quand il existe (Chrome sur Android) et ZXing, réglé pour les étiquettes de bibliothèque (Codabar 14 chiffres, ITF, Code 39/128) sur une bande centrale de l'image en pleine résolution. Un code présent dans l'extraction est accepté tout de suite ; un code inconnu doit être lu deux fois à l'identique. La lampe est proposée quand le téléphone le permet. Un ISBN (13 chiffres commençant par 978/979) est signalé comme tel : c'est le code de l'éditeur, absent des extractions. L'image n'est ni enregistrée ni envoyée. La caméra n'est accessible qu'en HTTPS : c'est le cas sur GitHub Pages.
 
 ## Confidentialité
 
-Tout se passe dans le navigateur. Le fichier n'est ni envoyé ni conservé : pas de serveur, pas de cookie, pas de mesure d'audience. Seules les décisions saisies sont gardées localement, sur l'appareil, et peuvent être effacées depuis l'onglet « Exporter ». Seules les bibliothèques JavaScript (SheetJS, ExcelJS, PptxGenJS, jsPDF, ZXing) sont chargées depuis un CDN public.
+Tout se passe dans le navigateur. Le fichier n'est ni envoyé ni conservé : pas de serveur, pas de cookie, pas de mesure d'audience. Seules les décisions, notes et photos saisies sont gardées localement, sur l'appareil, et peuvent être effacées depuis l'onglet « Exporter ». Seules les bibliothèques JavaScript (SheetJS, ExcelJS, PptxGenJS, jsPDF, JSZip, ZXing) sont chargées depuis un CDN public.
 
 ## Colonnes reconnues
 

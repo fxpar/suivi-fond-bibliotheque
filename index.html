@@ -36,13 +36,13 @@
   <!-- Dépôt -->
   <section id="dropSection">
     <label class="drop" id="drop" for="fileInput">
-      <input type="file" id="fileInput" accept=".xlsx,.xls,.ods,.csv" multiple>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.ods,.csv,.zip" multiple>
       <span class="drop-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0L8 8m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
       </span>
       <strong>Déposez votre feuille de suivi de fonds</strong>
       <span>ou cliquez pour la choisir — Excel, ODS ou CSV, plusieurs onglets ou fichiers acceptés</span>
-      <span class="drop-hint">Vous avez un classeur de pistes déjà annoté ? Déposez-le avec l'extraction pour retrouver vos décisions.</span>
+      <span class="drop-hint">Vous avez une sauvegarde (classeur annoté ou ZIP avec photos) ? Déposez-la avec l'extraction pour retrouver votre travail.</span>
     </label>
     <div class="intro">
       <div>
@@ -108,6 +108,19 @@
   </div>
 </aside>
 
+<!-- Changer de fichier -->
+<dialog class="sheet confirm" id="confirmNew" aria-label="Changer de fichier">
+  <form method="dialog">
+    <h2>Changer de fichier ?</h2>
+    <p id="confirmText"></p>
+    <div class="cbtns">
+      <button class="btn" value="save" id="confirmSave">Télécharger la sauvegarde puis changer</button>
+      <button class="btn ghost" value="nosave">Changer sans télécharger</button>
+      <button class="btn ghost" value="cancel">Annuler</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Fiche d'un exemplaire -->
 <dialog class="sheet" id="fiche" aria-label="Fiche exemplaire"><div id="ficheBody"></div></dialog>
 
@@ -115,11 +128,13 @@
 <dialog class="sheet scanner" id="scanner" aria-label="Scanner un code-barres">
   <div class="scan-view"><video id="scanVideo" playsinline muted></video><div class="scan-frame"></div></div>
   <p class="scan-msg" id="scanMsg">Visez le code-barres de l'exemplaire</p>
-  <button class="btn" id="scanClose" type="button">Fermer</button>
+  <p class="scan-tip">Code bien à l'horizontale dans le cadre, à 10-15 cm. Les étiquettes longues et fines passent mieux en tenant le téléphone en paysage.</p>
+  <div class="btnrow center"><button class="btn ghost" id="scanTorch" type="button" hidden>Lampe</button><button class="btn" id="scanClose" type="button">Fermer</button></div>
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="assets/decisions.js"></script>
+<script src="assets/photos.js"></script>
 <script src="assets/parse.js"></script>
 <script src="assets/analyse.js"></script>
 <script src="assets/exports.js"></script>

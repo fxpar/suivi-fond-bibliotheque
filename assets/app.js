@@ -24,8 +24,32 @@
     $('#btnReset').hidden = true; $('#btnMenu').hidden = true;
     closeDrawer();
   }
-  $('#btnReset').addEventListener('click', reset);
-  $('#drawerReset').addEventListener('click', reset);
+  // Avant de changer de fichier : proposer de télécharger la sauvegarde
+  SF.computedAll = () => { const f = state.fonds; state.fonds = ALL; try { return SF.computed(); } finally { state.fonds = f; } };
+  async function askReset() {
+    closeDrawer();
+    const nd = SF.dec.count(), np = await SF.photos.count();
+    if (!nd && !np) return reset();
+    const dlg = $('#confirmNew');
+    const parts = [nd && `${F.int(nd)} ${F.plural(nd, 'décision ou note', 'décisions ou notes')}`, np && `${F.int(np)} ${F.plural(np, 'photo')}`].filter(Boolean).join(' et ');
+    $('#confirmText').innerHTML = `Vous avez <strong>${parts}</strong>. Elles restent gardées dans ce navigateur, sur cet appareil, mais seul un fichier téléchargé est une vraie sauvegarde.`;
+    $('#confirmSave').textContent = np ? 'Télécharger la sauvegarde (ZIP) puis changer' : 'Télécharger le classeur puis changer';
+    dlg.returnValue = '';
+    dlg.showModal();
+  }
+  $('#confirmNew').addEventListener('close', async () => {
+    const v = $('#confirmNew').returnValue;
+    if (v === 'save') {
+      try {
+        const c = SF.computedAll();
+        if (await SF.photos.count()) await SF.exportZip(c); else await SF.exportXlsx(c);
+        toast('Sauvegarde téléchargée.');
+      } catch (e) { console.error(e); toast('Échec de la sauvegarde : ' + (e.message || e)); return; }
+      reset();
+    } else if (v === 'nosave') reset();
+  });
+  $('#btnReset').addEventListener('click', askReset);
+  $('#drawerReset').addEventListener('click', askReset);
 
   // ---------- thème jour / nuit ----------
   const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
@@ -61,18 +85,21 @@
     drop.classList.add('busy');
     try {
       const items = [], sheets = [], decs = [];
+      let nPh = 0;
       for (const f of files) {
         const r = await SF.readFile(f);
         items.push(...r.items); sheets.push(...r.sheets);
         if (r.decisions) decs.push(...r.decisions);
+        nPh += r.photos || 0;
       }
       const nDec = decs.length ? SF.dec.merge(decs) : 0;
+      const msg = [nDec && `${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'}`, nPh && `${F.int(nPh)} ${F.plural(nPh, 'photo')} ${nPh > 1 ? 'reprises' : 'reprise'}`].filter(Boolean).join(', ');
       if (!items.length) {
-        if (decs.length && state.items.length) { render(); toast(`${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'} depuis le classeur annoté.`); return; }
-        if (decs.length) throw new Error(`Classeur de décisions lu (${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'}). Déposez maintenant l'extraction du fonds pour les retrouver dans les listes.`);
+        if ((decs.length || nPh) && state.items.length) { render(); toast(msg ? `${msg} depuis la sauvegarde.` : 'Rien de nouveau dans cette sauvegarde.'); return; }
+        if (decs.length || nPh) throw new Error(`Sauvegarde lue (${msg || 'rien de nouveau'}). Déposez maintenant l'extraction du fonds pour les retrouver.`);
         throw new Error('Aucune ligne exploitable trouvée. Vérifiez que la feuille contient bien des en-têtes comme « Cote », « Titre », « Dernier emprunt », « Nb prêts année »…');
       }
-      if (nDec) setTimeout(() => toast(`${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'} depuis le classeur annoté.`), 300);
+      if (msg) setTimeout(() => toast(`${msg} depuis la sauvegarde.`), 300);
       // texte de recherche pré-calculé (titre, série, auteur)
       for (const it of items) it._s = SF.norm(`${it.titre} ${it.serie} ${it.tome ?? ""} ${it.auteur}`);
       Object.assign(state, { items, sheets, files: files.map(f => f.name), ctx: SF.context(items), fonds: ALL, open: null, allP: null });
@@ -344,17 +371,22 @@
         </article>
       </div>
       <div class="card savebox">
-        <h3>Garder vos décisions</h3>
-        <p><strong>${F.int(total)} ${F.plural(total, 'décision')}</strong> ${total > 1 ? 'sont gardées' : 'est gardée'} dans ce navigateur, sur cet appareil seulement : c'est un filet de sécurité, pas une sauvegarde (vider le cache les efface).</p>
+        <h3>Sauvegarder votre travail</h3>
+        <p><strong>${F.int(total)} ${F.plural(total, 'décision ou note', 'décisions ou notes')}</strong> et <strong><span id="phCount">…</span></strong> sont gardées dans ce navigateur, sur cet appareil seulement : c'est un filet de sécurité, pas une sauvegarde (vider le cache les efface).</p>
         <ol>
-          <li><strong>Téléchargez le classeur Excel</strong> : il contient vos décisions et se partage avec l'équipe. On peut aussi les compléter directement dans Excel.</li>
-          <li><strong>Redéposez-le ici</strong> plus tard, seul ou avec une nouvelle extraction : les décisions reviennent, et les titres déjà examinés apparaissent comme tels au lieu de revenir comme neufs.</li>
+          <li><strong>Téléchargez la sauvegarde complète</strong> : un ZIP avec le classeur Excel et un dossier « photos ». Une fois décompressé, l'onglet « Notes de rayon » du classeur ouvre chaque photo d'un clic. Les photos sont nommées <em>cote - titre - code-barres - date - n°</em>.</li>
+          <li><strong>Redéposez le ZIP (ou le classeur seul)</strong> plus tard, avec ou sans nouvelle extraction : décisions et photos reviennent, et les titres déjà examinés apparaissent comme tels.</li>
         </ol>
-        ${total ? '<button class="btn ghost small" id="decClear">Effacer les décisions de ce navigateur</button>' : ''}
+        <div class="btnrow"><button class="btn" id="exZip">Sauvegarde complète (ZIP)</button>${total ? '<button class="btn ghost small" id="decClear">Tout effacer de ce navigateur</button>' : '<button class="btn ghost small" id="decClear" hidden>Tout effacer de ce navigateur</button>'}</div>
       </div>`;
-    $('#decClear')?.addEventListener('click', () => {
-      if (!confirm('Effacer toutes les décisions gardées dans ce navigateur ? Celles déjà enregistrées dans un classeur Excel ne sont pas touchées.')) return;
-      SF.dec.clear(); render(); toast('Décisions effacées de ce navigateur.');
+    SF.photos.count().then(n => {
+      const el = $('#phCount'); if (el) el.textContent = `${F.int(n)} ${F.plural(n, 'photo')}`;
+      if (n) $('#decClear').hidden = false;
+    });
+    $('#exZip').addEventListener('click', e => run(e.target, () => SF.exportZip(SF.computed())));
+    $('#decClear')?.addEventListener('click', async () => {
+      if (!confirm('Effacer toutes les décisions, notes et photos gardées dans ce navigateur ? Ce qui a déjà été téléchargé (classeur, ZIP) n\'est pas touché.')) return;
+      SF.dec.clear(); await SF.photos.clear(); render(); toast('Décisions et photos effacées de ce navigateur.');
     });
     $('#exXlsx').addEventListener('click', e => run(e.target, () => SF.exportXlsx(SF.computed())));
     $('#exPptx').addEventListener('click', e => run(e.target, () => SF.exportPptx(SF.computed())));
@@ -429,7 +461,10 @@
     const exact = state.items.filter(it => it.cb && it.cb === digits);
     if (exact.length === 1) { sres.hidden = true; openFiche(exact[0]); return true; }
     if (state.results && state.results.length === 1) { sres.hidden = true; openFiche(state.results[0]); return true; }
-    toast(state.results && state.results.length ? `${state.results.length} exemplaires correspondent : choisissez dans la liste.` : `Code ${qIn.value} introuvable dans cette extraction.`);
+    const isbn = /^97[89]\d{10}$/.test(digits);
+    toast(state.results && state.results.length ? `${state.results.length} exemplaires correspondent : choisissez dans la liste.`
+      : isbn ? `${digits} est l'ISBN du livre (code de l'éditeur), absent de l'extraction. Scannez plutôt l'étiquette de l'exemplaire.`
+        : `Code ${qIn.value} introuvable dans cette extraction.`);
     qIn.focus();
     return false;
   };
@@ -462,7 +497,26 @@
       <h3 class="f-h">Constat en rayon</h3>
       ${decGroup('rayon', rk, true)}
       <label class="f-note">Note libre <textarea data-k="${esc(rk)}" rows="3" placeholder="Ex. : dos décollé, pages tachées, à montrer à l'équipe…">${esc(rc ? rc.com : '')}</textarea></label>
-      <p class="f-save muted">Enregistré au fur et à mesure. Retrouvé dans l'export Excel, onglet « Notes de rayon ».</p>`;
+      <div class="f-photos">
+        <div class="thumbs" id="thumbs"></div>
+        <label class="btn ghost small addphoto">
+          <input type="file" accept="image/*" capture="environment" multiple hidden id="photoIn">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          Ajouter une photo
+        </label>
+      </div>
+      <p class="f-save muted">Enregistré au fur et à mesure. Notes dans l'export Excel (onglet « Notes de rayon ») ; photos dans la sauvegarde ZIP.</p>`;
+    paintThumbs(rk);
+    $('#photoIn').addEventListener('change', async e => {
+      const files = [...e.target.files];
+      e.target.value = '';
+      if (!files.length) return;
+      toast(files.length > 1 ? 'Enregistrement des photos…' : 'Enregistrement de la photo…');
+      for (const f of files) { try { await SF.photos.add(rk, f); } catch (err) { console.error(err); toast('Photo illisible : ' + f.name); } }
+      if (!SF.photos.persistent) toast('Attention : ce navigateur ne garde pas les photos après fermeture. Téléchargez la sauvegarde ZIP.');
+      state.ficheDirty = true;
+      paintThumbs(rk);
+    });
     fiche.querySelector('.f-close').addEventListener('click', () => fiche.close());
     let t;
     fiche.querySelector('textarea').addEventListener('input', e => {
@@ -473,6 +527,23 @@
     fiche.scrollTop = 0;
   }
   SF.openFiche = openFiche;
+
+  // vignettes : URL temporaires libérées à chaque rafraîchissement
+  let thumbUrls = [];
+  async function paintThumbs(k) {
+    const box = $('#thumbs');
+    if (!box) return;
+    thumbUrls.forEach(u => URL.revokeObjectURL(u)); thumbUrls = [];
+    const list = (await SF.photos.list(k)).sort((a, b) => a.id - b.id);
+    box.innerHTML = list.map(r => {
+      const u = URL.createObjectURL(r.blob); thumbUrls.push(u);
+      return `<figure class="thumb"><a href="${u}" target="_blank" rel="noopener" title="Agrandir"><img src="${u}" alt="Photo du ${esc(r.date.split('-').reverse().join('/'))}"></a><button type="button" class="tdel" data-id="${r.id}" aria-label="Supprimer la photo">✕</button></figure>`;
+    }).join('');
+    box.querySelectorAll('.tdel').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('Supprimer cette photo ?')) return;
+      await SF.photos.remove(+b.dataset.id); state.ficheDirty = true; paintThumbs(k);
+    }));
+  }
   fiche.addEventListener('click', e => { if (e.target === fiche) fiche.close(); }); // clic sur le fond
   fiche.addEventListener('close', () => {
     const ta = fiche.querySelector('textarea');

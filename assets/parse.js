@@ -135,6 +135,7 @@ window.SF = window.SF || {};
 
   /** Lit un fichier et renvoie { items, sheets:[{file,name,rows,map,skipped}] } */
   SF.readFile = async function (file) {
+    if (/\.zip$/i.test(file.name)) return SF.readBackupZip(file); // sauvegarde classeur + photos
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array', cellDates: true, codepage: 65001 });
     // Classeur de pistes déjà annoté : on en tire les décisions, pas des exemplaires
