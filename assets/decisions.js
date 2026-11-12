@@ -6,6 +6,7 @@ window.SF = window.SF || {};
 (function (SF) {
   // Nom des feuilles de l'export Excel (sert aussi à reconnaître un classeur annoté)
   SF.SHEETS = {
+    prio: 'Priorités',
     dormants: 'Retirer - sans prêt',
     doublons: 'Retirer - doublons',
     usure: 'Remplacer - usure',
@@ -17,6 +18,7 @@ window.SF = window.SF || {};
 
   // Choix proposés selon la liste (le premier est « on ne touche à rien »)
   SF.CHOICES = {
+    prio: ['Garder', 'Mettre en avant', 'Transférer', 'Retirer'],
     dormants: ['Garder', 'Mettre en avant', 'Transférer', 'Retirer'],
     doublons: ['Garder', 'Retirer'],
     usure: ['État correct', 'Réparer', 'Remplacer', 'Retirer'],
@@ -38,6 +40,21 @@ window.SF = window.SF || {};
     const it = row.it;
     return `${pisteId}|${it.cb ? 'CB' + it.cb : 'T' + SF.norm(it.cote) + '|' + SF.norm(it.titre)}`;
   };
+
+  // ---------- rayons et règles de protection (gardés avec les décisions) ----------
+  SF.SEG_STATUS = ['À conserver', 'À repenser en bloc']; // vide = examiné exemplaire par exemplaire
+  SF.RULES_SHEET = 'Rayons et protections';
+  SF.segDecKey = (fonds, seg) => `seg|${SF.norm(fonds)}|${seg}`;
+  SF.ruleKey = (type, value) => `rule|${type}|${SF.norm(value)}`;
+  SF.RULE_TYPES = { cote: 'Cote contenant', titre: 'Titre ou série contenant' };
+  /** Règles actives : [{ key, type, value }] (le texte saisi est gardé dans le commentaire) */
+  SF.rules = () => Object.keys(store).filter(k => k.startsWith('rule|') && store[k].d)
+    .map(k => ({ key: k, type: k.split('|')[1], value: store[k].com || k.split('|').slice(2).join('|'), norm: k.split('|').slice(2).join('|') }));
+  /** « Garder » ou « Mettre en avant » déjà décidé pour cet exemplaire, dans une liste ou sur sa fiche */
+  SF.isKept = it => ['prio', 'dormants', 'doublons', 'rayon'].some(pid => {
+    const e = store[SF.decKey(pid, { it })];
+    return e && (e.d === 'Garder' || e.d === 'Mettre en avant');
+  });
 
   // ---------- stockage ----------
   const LS = 'suivi-fonds-decisions-v1';
@@ -85,6 +102,7 @@ window.SF = window.SF || {};
     const entries = [];
     const byName = Object.fromEntries(Object.entries(SF.SHEETS).map(([k, v]) => [v, k]));
     for (const name of wb.SheetNames) {
+      if (name === SF.RULES_SHEET) { entries.push(...readRules(wb.Sheets[name])); continue; }
       const pid = byName[name];
       if (!pid) continue;
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
@@ -112,4 +130,25 @@ window.SF = window.SF || {};
     }
     return entries;
   };
+
+  /** Feuille « Rayons et protections » : statut de chaque rayon et règles de protection */
+  function readRules(ws) {
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+    if (rows.length < 2) return [];
+    const h = rows[0].map(SF.norm);
+    const col = l => h.indexOf(SF.norm(l));
+    const iType = col('Type'), iF = col('Fonds'), iV = col('Rayon ou règle'), iS = col('Statut');
+    if (iType < 0 || iV < 0 || iS < 0) return [];
+    const out = [];
+    for (const r of rows.slice(1)) {
+      const type = SF.norm(r[iType]), v = r[iV] == null ? '' : String(r[iV]).trim(), st = r[iS] == null ? '' : String(r[iS]).trim();
+      if (!v || !st) continue;
+      if (type === 'rayon') out.push({ key: SF.segDecKey(r[iF] || '', v), d: st, com: '', date: today() });
+      else if (type.startsWith('regle')) {
+        const t = /titre|serie/.test(type) ? 'titre' : 'cote';
+        out.push({ key: SF.ruleKey(t, v), d: 'Protégé', com: v, date: today() });
+      }
+    }
+    return out;
+  }
 })(window.SF);

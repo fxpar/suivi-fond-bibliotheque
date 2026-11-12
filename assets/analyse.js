@@ -126,6 +126,16 @@ window.SF = window.SF || {};
         else out.push(`Les documents publiés avant 2010 sortent ${F.dec(ro)} fois/an contre ${F.dec(rm)} pour ceux des années 2010 : l'ancienneté pèse sur la circulation, à regarder titre par titre.${nouv}`);
       }
     }
+    if (pistes && pistes.segs) {
+      // le sommeil se concentre-t-il dans quelques rayons ?
+      const all = [...pistes.segs.values()];
+      const calm = all.filter(s => s.calme && s.status !== 'À conserver');
+      const totDorm = all.reduce((a, s) => a + s.dorm, 0);
+      const cd = calm.reduce((a, s) => a + s.dorm, 0), cn = calm.reduce((a, s) => a + s.n, 0);
+      if (calm.length && totDorm >= 10 && cd / totDorm >= 0.25) {
+        out.push(`Le sommeil se concentre : ${calm.length > 1 ? 'les rayons' : 'le rayon'} ${calm.map(s => `« ${s.seg} »`).join(', ')} (${F.pct(cn / t.n)} du fonds) ${calm.length > 1 ? 'regroupent' : 'regroupe'} <strong>${F.int(cd)} des ${F.int(totDorm)}</strong> documents en sommeil : une question de rayon, à trancher en bloc.`);
+      }
+    }
     if (pistes) {
       const u = pistes.find(p => p.id === 'usure');
       if (u && u.rows.length) out.push(`${F.int(u.rows.length)} ${F.plural(u.rows.length, 'exemplaire')} ${u.rows.length > 1 ? 'dépassent' : 'dépasse'} ${pistes.opts.usure} prêts : un passage en rayon pour vérifier leur état est conseillé.`);
@@ -171,10 +181,16 @@ window.SF = window.SF || {};
       if (histOK) return { m: ctx.histMonths, txt: `Aucun prêt enregistré depuis ${F.mois(ctx.histStart)}` };
       return null;
     };
+    // Protections choisies par l'équipe : rayon « à conserver », règle (cote, titre), « Garder » déjà décidé
+    const protect = typeof opts.protect === 'function' ? opts.protect : () => null;
+    const shelfProtected = it => { const p = protect(it); return p === 'rayon' || p === 'regle'; };
+    let nShelfProt = 0;
+
     const dormRows = [];
     for (const it of items) {
       const d = isDormant(it);
       if (!d) continue;
+      if (shelfProtected(it)) { nShelfProt++; continue; }
       let note = '';
       let prio = 1;
       if (it.serieKey && it.tome != null) {
@@ -204,7 +220,7 @@ window.SF = window.SF || {};
         if (pa / g.length >= 1.5) continue;
         // on garde l'exemplaire le moins usé (moins de prêts totaux), on propose les autres
         const sorted = [...g].sort((a, b) => (a.pv ?? 0) - (b.pv ?? 0));
-        sorted.slice(1).forEach(it => doubRows.push({
+        sorted.slice(1).filter(it => !shelfProtected(it)).forEach(it => doubRows.push({
           it, motif: `${g.length} exemplaires, ${pa} ${F.plural(pa, 'prêt')} sur l'année au total`,
           note: `Exemplaire gardé : le moins usé (${sorted[0].pv ?? '?'} prêts, ${sorted[0].cb || sorted[0].cote})`, prio: 1, tri: -pa
         }));
@@ -260,12 +276,61 @@ window.SF = window.SF || {};
     const regRows = items.filter(it => ['DP', 'PC', 'TP', 'TC'].includes(it.code) || /perdu|contest|r[ée]paration|manquant/i.test(it.statut))
       .map(it => ({ it, motif: it.statut, note: it.dernier ? `Dernier prêt : ${F.mois(it.dernier)}` : '', prio: 1, tri: 0 }));
 
+    // --- rayons : chaque exemplaire est comparé à son rayon, pas au fonds entier ---
+    const segs = SF.segStats(items, ref, isDormant, opts);
+    const fondsAgg = segs.fonds;
+
+    // --- liste ciblée : cumul de signaux, comparés à la norme du rayon, garde-fous appliqués ---
+    const universe = opts.allItems || items; // pour « présent dans un autre fonds » même si un seul fonds est affiché
+    const where = new Map();
+    for (const it of universe) {
+      const k = SF.norm(it.titre) + '|' + it.serieKey + '|' + (it.tome ?? '');
+      if (!where.has(k)) where.set(k, new Set());
+      where.get(k).add(it.fonds);
+    }
+    const excl = { rayon: 0, regle: 0, garde: 0, bloc: 0, serie: 0 };
+    const prioRows = [];
+    for (const it of items) {
+      const reasons = [];
+      let score = 0;
+      const d = isDormant(it);
+      if (d) { score += 3; reasons.push(d.txt); }
+      const r = SF.rotVie(it, ref);
+      const s = segs.get(it.segKey), f = fondsAgg.get(it.fonds);
+      const norme = s && s.n >= 20 && s.med != null ? s.med : f && f.med;
+      if (r != null && norme && r < 0.5 * norme) { score += 2; reasons.push(`${F.dec(r)} prêt par an depuis ${it.crea.getFullYear()}, contre ${F.dec(norme)} en médiane dans son rayon`); }
+      if (it.pv != null && it.pv >= 60 && (it.pa || 0) <= 1) { score += 2; reasons.push(`${it.pv} prêts au total mais ${it.pa ? 'un seul' : 'aucun'} cette année : usé et délaissé`); }
+      const g = groups.get(keyOf(it));
+      if (g && g.length > 1 && g.reduce((a, i) => a + (i.pa || 0), 0) / g.length < 1.5) { score += 2; reasons.push(`${g.length} exemplaires dans ce fonds, peu demandés`); }
+      const others = [...(where.get(SF.norm(it.titre) + '|' + it.serieKey + '|' + (it.tome ?? '')) || [])].filter(x => x !== it.fonds);
+      if (others.length) { score += 1; reasons.push(`aussi en « ${others.join(' », « ')} »`); }
+      const sr = it.serieKey && it.tome != null ? series.get(it.fonds + '|' + it.serieKey) : null;
+      if (d && sr && sr.tomes.length > 1 && sr.actifs === 0) { score += 1; reasons.push(`toute la série dort (${sr.items.length} ex.)`); }
+      if (score < 5) continue;
+      // garde-fous automatiques : en prêt, récent, encore emprunté, tome d'une série active
+      if (OUT.has(it.code) || (it.crea && months(it.crea, ref) < 24) || (it.pa || 0) >= 2) continue;
+      if (sr && sr.tomes.length > 1 && sr.actifs - (it.dernier && months(it.dernier, ref) <= 12 ? 1 : 0) > 0) { excl.serie++; continue; }
+      // garde-fous choisis par l'équipe
+      const p = protect(it);
+      if (p) { excl[p] = (excl[p] || 0) + 1; continue; }
+      prioRows.push({ it, score, reasons, motif: reasons.join(' · '), note: `Rayon ${it.seg} · ${score} points`, prio: 1, tri: -score });
+    }
+    prioRows.sort((a, b) => (a.it.fonds || '').localeCompare(b.it.fonds || '', 'fr') || (a.it.seg || '').localeCompare(b.it.seg || '', 'fr') ||
+      b.score - a.score || (a.it.cote || '').localeCompare(b.it.cote || '', 'fr', { numeric: true }) || (a.it.tome ?? 0) - (b.it.tome ?? 0));
+
     const pistes = [
+      {
+        id: 'prio', group: 'Priorités', action: 'Examiner en priorité', tone: 'retirer', kind: 'prio',
+        title: 'Liste ciblée', rows: prioRows, excl,
+        why: 'Exemplaires qui cumulent plusieurs signaux, comparés à leur propre rayon, sans raison évidente de les garder.',
+        caution: 'Ce n’est pas une décision : c’est par là qu’il est le plus utile de commencer.'
+      },
       {
         id: 'dormants', group: 'Retirer ?', action: 'Retirer', tone: 'retirer',
         title: `Pas sortis depuis ${opts.dormant} mois`, rows: dormRows,
         why: `Exemplaires en rayon dont le dernier prêt remonte à plus de ${opts.dormant} mois (hors acquisitions récentes).`,
         caution: 'Les tomes d\'une série encore active sont surlignés en fin de liste : les retirer gênerait les lecteurs de la série.' +
+          (nShelfProt ? ` ${nShelfProt} ${F.plural(nShelfProt, 'exemplaire')} de rayons ou règles protégés ne ${nShelfProt > 1 ? 'sont' : 'est'} pas ${nShelfProt > 1 ? 'listés' : 'listé'}.` : '') +
           (ctx.histTronque ? ` L'historique des prêts ne remonte qu'à ${F.mois(ctx.histStart)}.` : '')
       },
       {
@@ -299,10 +364,73 @@ window.SF = window.SF || {};
         caution: 'À traiter dans le SIGB : remplacement, relance ou retrait du catalogue.'
       }
     ];
-    for (const p of pistes) p.rows.sort((a, b) => a.prio - b.prio || a.tri - b.tri || (a.it.cote || '').localeCompare(b.it.cote || '', 'fr') || a.it.titre.localeCompare(b.it.titre, 'fr'));
+    for (const p of pistes) if (p.id !== 'prio') p.rows.sort((a, b) => a.prio - b.prio || a.tri - b.tri || (a.it.cote || '').localeCompare(b.it.cote || '', 'fr') || a.it.titre.localeCompare(b.it.titre, 'fr'));
     pistes.opts = opts;
     pistes.series = series;
+    pistes.segs = segs;
     return pistes;
+  };
+
+  /** Prêts par an depuis l'entrée de l'exemplaire (au moins 2 ans de recul) */
+  SF.rotVie = (it, ref) => (it.pv != null && it.crea ? it.pv / Math.max(2, months(it.crea, ref) / 12) : null);
+
+  /**
+   * Rayons : la cote sans le code auteur. Dans chaque famille de cotes de même forme
+   * (même fonds, même premier élément, même nombre d'éléments), l'élément le plus varié est l'auteur.
+   * « B.D. ARL DOC » -> « B.D. … DOC » ; « P.F. B.D. FER » -> « P.F. B.D. … » ; « COM ABE » -> « COM … »
+   */
+  SF.assignSegments = function (items) {
+    const fam = new Map();
+    for (const it of items) {
+      const t = String(it.cote || '').split(/\s+/).filter(w => w && !/^\d+$/.test(w));
+      it._t = t;
+      const k = it.fonds + '|' + (t[0] || '') + '|' + t.length;
+      if (!fam.has(k)) fam.set(k, []);
+      fam.get(k).push(it);
+    }
+    for (const list of fam.values()) {
+      const L = list[0]._t.length;
+      let pos = -1, best = 1;
+      if (L >= 2 && list.length >= 5) {
+        for (let i = 0; i < L; i++) {
+          const n = new Set(list.map(x => x._t[i])).size;
+          if (n > best) { best = n; pos = i; }
+        }
+      }
+      for (const it of list) {
+        const t = it._t;
+        it.seg = !t.length ? '(sans cote)' : pos >= 0 ? t.map((w, i) => (i === pos ? '…' : w)).join(' ') : (t.length > 1 ? t[0] + ' …' : t[0]);
+        it.segKey = it.fonds + '|' + it.seg;
+        delete it._t;
+      }
+    }
+  };
+
+  /** Statistiques par rayon (et par fonds) : effectif, en sommeil, prêts/an médians depuis l'entrée */
+  SF.segStats = function (items, ref, isDormant, opts) {
+    const med = a => { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
+    const segs = new Map(), fonds = new Map();
+    for (const it of items) {
+      const k = it.segKey || it.fonds + '|';
+      if (!segs.has(k)) segs.set(k, { key: k, fonds: it.fonds, seg: it.seg || '', n: 0, dorm: 0, pa: 0, rots: [] });
+      if (!fonds.has(it.fonds)) fonds.set(it.fonds, { n: 0, dorm: 0, rots: [] });
+      const s = segs.get(k), f = fonds.get(it.fonds);
+      const dm = isDormant(it) ? 1 : 0, r = SF.rotVie(it, ref);
+      s.n++; s.dorm += dm; s.pa += it.pa || 0; f.n++; f.dorm += dm;
+      if (r != null) { s.rots.push(r); f.rots.push(r); }
+    }
+    for (const f of fonds.values()) { f.med = med(f.rots); f.part = f.n ? f.dorm / f.n : 0; delete f.rots; }
+    for (const s of segs.values()) {
+      const f = fonds.get(s.fonds);
+      s.med = med(s.rots); delete s.rots;
+      s.part = s.n ? s.dorm / s.n : 0;
+      s.rot = s.n ? s.pa / s.n : 0;
+      s.small = s.n < 30;                                    // petit effectif : pourcentages fragiles
+      s.calme = s.n >= 15 && s.dorm >= 5 && s.part >= Math.max(0.15, 2 * f.part); // nettement plus calme que son fonds
+      s.status = typeof opts.segStatus === 'function' ? opts.segStatus(s) : '';
+    }
+    segs.fonds = fonds;
+    return segs;
   };
 
   function compact(nums) {

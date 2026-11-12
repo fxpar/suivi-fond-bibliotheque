@@ -84,6 +84,24 @@ window.SF = window.SF || {};
     hp.font = { bold: true };
     SF.PERIODES.forEach((p, i) => { const x = c.ov.total.periodes[i]; if (x.n) syn.addRow([p.label, x.n, '', x.pa, '', x.rot]); });
 
+    // --- Rayons et protections (réimportable : la colonne Statut fait foi) ---
+    const rs = wb.addWorksheet(SF.RULES_SHEET, { views: [{ state: 'frozen', ySplit: 1 }] });
+    rs.columns = [
+      { header: 'Type', key: 'type', width: 26 }, { header: 'Fonds', key: 'fonds', width: 18 }, { header: 'Rayon ou règle', key: 'v', width: 26 },
+      { header: 'Documents', key: 'n', width: 11 }, { header: 'En sommeil', key: 'dorm', width: 11 }, { header: 'Part en sommeil', key: 'part', width: 14, style: { numFmt: '0%' } },
+      { header: 'Prêts par doc. sur l\'année', key: 'rot', width: 14, style: { numFmt: '0.0' } }, { header: 'Repère', key: 'rep', width: 28 },
+      { header: 'Statut', key: 'st', width: 20 }
+    ];
+    [...c.pistes.segs.values()].filter(s => s.n >= 5).sort((a, b) => cmp(a.fonds, b.fonds) || b.n - a.n).forEach(s => {
+      const row = rs.addRow({ type: 'Rayon', fonds: s.fonds, v: s.seg, n: s.n, dorm: s.dorm, part: s.part, rot: s.rot,
+        rep: [s.calme ? 'nettement plus calme que le fonds' : '', s.small ? 'petit effectif' : ''].filter(Boolean).join(', '), st: s.status || null });
+      row.getCell('st').dataValidation = { type: 'list', allowBlank: true, showErrorMessage: false, formulae: [`"${SF.SEG_STATUS.join(',')}"`] };
+      if (s.calme) row.getCell('v').fill = fill(C.amber);
+    });
+    SF.rules().forEach(r => rs.addRow({ type: 'Règle : ' + (SF.RULE_TYPES[r.type] || r.type).toLowerCase(), v: r.value, st: 'Protégé' }));
+    styleHeader(rs);
+    line([SF.RULES_SHEET, '', 'Rayons (déduits de la cote) et protections : « À conserver » les retire des propositions, « À repenser en bloc » les sort de la liste ciblée. Modifiable ici, réimportable.']);
+
     // --- Listes ---
     for (const p of c.pistes) {
       if (!p.rows.length) continue;
@@ -376,9 +394,34 @@ window.SF = window.SF || {};
       }, { x: M, y: 2.0, w: W - 2 * M, h: 4.5 });
     }
 
-    // 6. Pistes de gestion
+    // 6. Où agir en priorité : rayons, puis liste ciblée
+    const prio = c.pistes.find(p => p.id === 'prio');
+    if (prio && c.pistes.segs) {
+      const segs = [...c.pistes.segs.values()].filter(s => s.n >= 15 && (s.calme || s.status)).sort((a, b) => b.part - a.part).slice(0, 6);
+      base('Où agir en priorité', 'D’abord décider des rayons peu empruntés, en bloc ; ensuite examiner une liste courte d’exemplaires.');
+      if (segs.length) {
+        R.table([[hd('Rayon'), hd('Docs'), hd('En sommeil'), hd('Décision')]].concat(segs.map(s => [
+          { text: s.seg + (c.ov.fonds.length > 1 ? ' (' + s.fonds + ')' : ''), bold: true, size: 13, color: INK },
+          { text: F.int(s.n), size: 13, color: INK },
+          { text: `${F.int(s.dorm)} (${F.pct(s.part)})`, size: 13, color: DEEP, bold: true },
+          { text: s.status || 'à décider', size: 12, color: s.status ? INK : MUTED }
+        ])), { x: M, y: 1.95, w: 7.4, colW: [3.2, 1.0, 1.5, 1.7], rowH: 0.5 });
+      } else {
+        R.text('Aucun rayon ne se distingue nettement : la circulation est homogène.', { x: M, y: 2.0, w: 7.4, h: 0.6, size: 15, color: MUTED, valign: 'top' });
+      }
+      const ex = prio.excl, exTxt = [ex.rayon && `${F.int(ex.rayon)} dans des rayons à conserver`, ex.regle && `${F.int(ex.regle)} protégés par une règle`, ex.garde && `${F.int(ex.garde)} déjà gardés`, ex.bloc && `${F.int(ex.bloc)} dans des rayons à repenser en bloc`].filter(Boolean);
+      R.rect(8.4, 1.95, W - M - 8.4, 3.6, LIGHT);
+      R.text(F.int(prio.rows.length), { x: 8.7, y: 2.1, w: W - M - 9, h: 1.1, size: 54, bold: true, color: DEEP });
+      R.text('exemplaires en liste ciblée', { x: 8.7, y: 3.15, w: W - M - 9, h: 0.45, size: 17, color: INK });
+      R.text('Ils cumulent plusieurs signaux (sommeil, faible usage comparé à leur rayon, usure sans demande…).' + (exTxt.length ? ' Écartés par les choix de l’équipe : ' + exTxt.join(', ') + '.' : ''),
+        { x: 8.7, y: 3.65, w: W - M - 9, h: 1.8, size: 13, color: MUTED, valign: 'top' });
+      R.text('Chaque exemplaire est comparé à la norme de son propre rayon : un rayon entier peu emprunté se décide en bloc (à conserver pour sa mission, ou à repenser), pas exemplaire par exemplaire.',
+        { x: M, y: 6.0, w: W - 2 * M, h: 0.8, size: 12, color: MUTED, valign: 'bottom', italic: true });
+    }
+
+    // 7. Pistes de gestion
     base('Pistes de gestion', 'Repérées dans les données, puis vérifiées en rayon par l\'équipe avant toute décision.');
-    const lab = { dormants: 'Retirer ?', doublons: 'Retirer un exemplaire ?', usure: 'Remplacer ?', demande: 'Renforcer ?', series: 'Compléter ?', regul: 'Régulariser' };
+    const lab = { prio: 'Liste ciblée', dormants: 'Retirer ?', doublons: 'Retirer un exemplaire ?', usure: 'Remplacer ?', demande: 'Renforcer ?', series: 'Compléter ?', regul: 'Régulariser' };
     R.table([[hd('Piste'), hd('Volume'), hd('Critère')]].concat(c.pistes.filter(p => p.rows.length).map(p => [
       { text: lab[p.id], bold: true, size: 14, color: INK },
       { text: `${F.int(p.rows.length)} ${p.kind === 'series' ? F.plural(p.rows.length, 'série') : 'ex.'}`, size: 14, color: DEEP, bold: true },
@@ -568,18 +611,25 @@ window.SF = window.SF || {};
     SF.PERIODES.forEach((p, i) => { const x = t.periodes[i]; if (x.n) L.push(`- ${p.label} : ${F.dec(x.rot)} (${x.n} doc.)`); });
     L.push('', `PISTES REPÉRÉES (seuils : ${c.pistes.opts.dormant} mois sans prêt, usure ${c.pistes.opts.usure} prêts, demande ${c.pistes.opts.demande} prêts/an) :`);
     c.pistes.forEach(p => L.push(`- ${p.title} : ${p.rows.length}`));
-    const dorm = c.pistes.find(p => p.id === 'dormants').rows.slice(0, 40);
-    if (dorm.length) {
-      L.push('', 'EXEMPLES DE DOCUMENTS EN SOMMEIL (cote | titre | série | publication | motif) :');
-      dorm.forEach(r => L.push(`- ${r.it.cote} | ${r.it.titre} | ${r.it.serie ? r.it.serie + (r.it.tome != null ? ' t.' + r.it.tome : '') : '-'} | ${r.it.pub ?? '?'} | ${r.motif}${r.note ? ' | ' + r.note : ''}`));
+    if (c.pistes.segs) {
+      L.push('', 'RAYONS (déduits de la cote ; documents / en sommeil / prêts par doc. sur l\'année / décision de l\'équipe) :');
+      [...c.pistes.segs.values()].filter(s => s.n >= 5).forEach(s => L.push(`- ${s.fonds} · ${s.seg} : ${s.n} / ${s.dorm} (${F.pct(s.part)}) / ${F.dec(s.rot)}${s.calme ? ' / nettement plus calme que le fonds' : ''}${s.status ? ' / ' + s.status : ''}`));
+      const rules = SF.rules();
+      if (rules.length) L.push('Protégés par l\'équipe : ' + rules.map(r => `${(SF.RULE_TYPES[r.type] || r.type).toLowerCase()} « ${r.value} »`).join(', '));
+    }
+    const cible = c.pistes.find(p => p.id === 'prio').rows.slice(0, 40);
+    if (cible.length) {
+      L.push('', 'LISTE CIBLÉE : exemplaires qui cumulent plusieurs signaux, comparés à leur rayon (cote | titre | série | publication | raisons) :');
+      cible.forEach(r => L.push(`- ${r.it.cote} | ${r.it.titre} | ${r.it.serie ? r.it.serie + (r.it.tome != null ? ' t.' + r.it.tome : '') : '-'} | ${r.it.pub ?? '?'} | ${r.reasons.join(' ; ')}`));
     }
     const ser = c.pistes.find(p => p.id === 'series').rows.slice(0, 15);
     if (ser.length) { L.push('', 'SÉRIES INCOMPLÈTES QUI CIRCULENT :'); ser.forEach(r => L.push(`- ${r.serie.nom} : ${r.motif} (${r.note})`)); }
     L.push('', 'Ce que j\'attends :',
       '1. Une lecture de la santé de ce fonds en 5 lignes, pour la direction.',
-      '2. Parmi les titres en sommeil listés, ceux qui mériteraient d\'être gardés (classiques, patrimoine, auteurs reconnus, séries de référence) et pourquoi.',
-      '3. Des pistes de valorisation (mise en avant, table thématique, animation) avant tout retrait.',
-      '4. Les questions que l\'équipe devrait se poser, et les limites de ces chiffres.');
+      '2. Pour les rayons nettement plus calmes que le fonds : ce qui peut justifier de les conserver (mission, patrimoine, public spécifique) et ce qui pourrait les relancer.',
+      '3. Parmi les titres de la liste ciblée, ceux qui mériteraient d\'être gardés (classiques, patrimoine, auteurs reconnus, séries de référence) et pourquoi.',
+      '4. Des pistes de valorisation (mise en avant, table thématique, animation) avant tout retrait.',
+      '5. Les questions que l\'équipe devrait se poser, et les limites de ces chiffres.');
     return L.join('\n');
   };
 })(window.SF);

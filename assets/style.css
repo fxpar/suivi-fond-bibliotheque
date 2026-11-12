@@ -371,3 +371,34 @@ a.iconbtn { text-decoration: none; }
 .scope { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 12px 14px; margin-bottom: 6px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--gold); border-radius: var(--radius); font-size: .92rem; }
 .scope > span { font-weight: 700; }
 .scope label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+
+/* ---------- priorités : rayons et liste ciblée ---------- */
+.prio-card { border-left: 4px solid var(--gold); }
+.prio-card h3 { font-size: 1.08rem; }
+.segs td { vertical-align: middle; }
+.segs tr.calme td:first-child { box-shadow: inset 4px 0 0 var(--gold); }
+.segs tr.st-set td { background: var(--accent-soft); }
+.segs select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); max-width: 100%; }
+.rules { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 8px; font-size: .9rem; }
+.rules-t { font-weight: 700; }
+.rules select, .rules input { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); }
+.rules input { flex: 1 1 180px; min-width: 0; }
+.chips-r { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.rchip { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent-strong); border-radius: 999px; padding: 3px 4px 3px 12px; font-size: .85rem; }
+.rchip button { border: 0; background: transparent; color: inherit; cursor: pointer; width: 22px; height: 22px; border-radius: 50%; }
+.rchip button:hover { background: rgba(127, 127, 127, .2); }
+.howto { margin: 6px 0 10px; font-size: .88rem; color: var(--ink-2); }
+.howto summary { cursor: pointer; color: var(--accent-strong); font-weight: 600; }
+.howto p { margin: 6px 0; }
+.blocs { margin: 8px 0; padding-left: 18px; font-size: .9rem; }
+tr.seghead td { background: var(--surface-2); font-size: .88rem; padding-top: 10px; }
+ul.why { margin: 0; padding-left: 16px; font-size: .86rem; }
+ul.why li { margin: 1px 0; }
+@media (max-width: 720px) {
+  .tl-list tr.seghead { padding: 8px 6px; background: var(--surface-2); }
+  .tl-list tr.seghead td { background: transparent; }
+  .segs select { width: 100%; }
+  .tl-list.segs tr.st-set td, .tl-list.segs tr.calme td { background: transparent; box-shadow: none; }
+  .tl-list.segs tr.st-set { background: var(--accent-soft); }
+  .tl-list.segs tr.calme { box-shadow: inset 4px 0 0 var(--gold); }
+}

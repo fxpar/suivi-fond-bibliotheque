@@ -3,9 +3,21 @@
 Outil web pour analyser une extraction de fonds de bibliothèque (export SIGB en Excel, ODS ou CSV, un ou plusieurs onglets) et en tirer :
 
 - **une vue d'ensemble** : circulation par fonds, part du fonds / part des prêts, rotation selon l'âge des documents, constats rédigés ;
+- **des priorités** : les rayons peu empruntés à décider en bloc (à conserver ou à repenser), puis une liste ciblée d'exemplaires qui cumulent plusieurs signaux, comparés à leur propre rayon ;
 - **des pistes à examiner**, chacune motivée et réglable : *retirer ?* (sans prêt depuis N mois, doublons peu demandés), *remplacer ?* (exemplaires très empruntés), *renforcer ?* (forte demande, séries incomplètes), *régulariser* (perdus, contestés, en réparation) ;
 - **une recherche d'exemplaire** (code-barres, cote ou titre), avec lecture du code-barres par la caméra sur téléphone : la fiche montre les listes où l'exemplaire apparaît et permet de noter un constat en rayon ;
 - **trois exports** : un classeur Excel prêt à annoter en rayon (une feuille par piste, triée par cote, colonne *Décision* à liste déroulante), une synthèse de 6 pages au plus pour la direction (PowerPoint ou PDF), un résumé texte à coller dans un assistant IA si on le souhaite.
+
+## Priorités : rayons et liste ciblée
+
+Les six listes « critère par critère » restent disponibles, mais l'onglet « À examiner » commence par deux questions distinctes :
+
+1. **Les rayons.** Un rayon est déduit de la cote, sans le code auteur (« B.D. ARL DOC » donne « B.D. … DOC »). Pour chacun : documents, nombre en sommeil (en effectifs, pas seulement en pourcentage ; « petit effectif » sous 30 documents), prêts par document. Un rayon **nettement plus calme** que son fonds (au moins 15 % en sommeil et deux fois la part du fonds) est signalé. L'équipe choisit pour chaque rayon : examiné exemplaire par exemplaire (par défaut), **à conserver** (mission, patrimoine, BD muettes…) ou **à repenser en bloc**.
+2. **La liste ciblée.** Les exemplaires qui cumulent plusieurs signaux, chacun **comparé à la norme de son propre rayon** : en sommeil (3 points), moins de la moitié des prêts annuels médians de son rayon depuis son entrée (2), usé et délaissé (2), doublon peu demandé (2), présent dans un autre fonds (1), série entièrement endormie (1). Retenu à partir de 5 points. Un document qui dort dans un rayon qui dort n'y figure que s'il est nettement plus faible que ses voisins.
+
+Garde-fous : sont écartés d'office les exemplaires en prêt ou réservés, entrés depuis moins de 2 ans, empruntés au moins 2 fois dans l'année, ou tomes d'une série encore active ; et, selon les choix de l'équipe, ceux des rayons « à conserver » ou « à repenser en bloc », ceux qui répondent à une **règle de protection** (cote ou titre contenant un texte, ex. « MUET ») et ceux déjà « gardés ». Les rayons protégés et les règles retirent aussi ces exemplaires des listes « Retirer ? ».
+
+Statuts des rayons et règles sont exportés dans l'onglet Excel « Rayons et protections » (modifiable, réimportable). La synthèse a une diapositive « Où agir en priorité ».
 
 ## Visite guidée
 
