@@ -38,7 +38,7 @@ window.SF = window.SF || {};
     regul: 'À régulariser'
   };
   const DECISIONS = '"À garder,À retirer,À remplacer,À réparer,À acheter,À transférer,À revoir"';
-  const C = { ink: '1F2933', blue: '1C5CAB', blueL: 'DCE9F9', amber: 'FFF1D6', grey: 'F3F2EE', line: 'D9D7D0' };
+  const C = { ink: '1F2933', blue: '487D96', blueL: 'E4EEF2', amber: 'FBF3CC', grey: 'F3F2EE', line: 'D9D7D0' };
 
   // ================= EXCEL =================
   SF.exportXlsx = async function (c) {
@@ -181,7 +181,7 @@ window.SF = window.SF || {};
     pptx.layout = 'LAYOUT_WIDE'; // 13,33 x 7,5 pouces
     pptx.title = `Suivi du fonds — ${c.label}`;
     const W = 13.33, M = 0.6, FONT = 'Calibri';
-    const INK = '1F2933', MUTED = '5F6B76', BLUE = '1C5CAB', LIGHT = 'F4F6F8';
+    const INK = '1F2933', MUTED = '5F6B76', BLUE = '487D96', DEEP = '2F5F75', GOLD = 'D9B600', LIGHT = 'EEF3F5';
     const t = c.ov.total, ctx = c.ctx;
     const foot = `${c.label} · données au ${F.date(ctx.ref)}`;
 
@@ -190,7 +190,8 @@ window.SF = window.SF || {};
       s.background = { color: 'FFFFFF' };
       s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 0.12, h: 7.5, fill: { color: BLUE }, line: { color: BLUE } });
       s.addText(title, { x: M, y: 0.4, w: W - 2 * M, h: 0.7, fontFace: FONT, fontSize: 28, bold: true, color: INK, margin: 0 });
-      if (lead) s.addText(lead, { x: M, y: 1.1, w: W - 2 * M, h: 0.6, fontFace: FONT, fontSize: 15, color: MUTED, margin: 0, valign: 'top' });
+      s.addShape(pptx.ShapeType.rect, { x: M, y: 1.0, w: 0.9, h: 0.06, fill: { color: GOLD }, line: { color: GOLD } });
+      if (lead) s.addText(lead, { x: M, y: 1.2, w: W - 2 * M, h: 0.6, fontFace: FONT, fontSize: 15, color: MUTED, margin: 0, valign: 'top' });
       s.addText(foot, { x: M, y: 7.0, w: W - 2 * M, h: 0.3, fontFace: FONT, fontSize: 10, color: MUTED, margin: 0 });
       return s;
     };
@@ -199,9 +200,10 @@ window.SF = window.SF || {};
     {
       const s = pptx.addSlide();
       s.background = { color: 'FFFFFF' };
-      s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.18, fill: { color: BLUE }, line: { color: BLUE } });
+      s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.9, fill: { color: BLUE }, line: { color: BLUE } });
+      s.addShape(pptx.ShapeType.rect, { x: 0, y: 0.9, w: W, h: 0.08, fill: { color: GOLD }, line: { color: GOLD } });
       s.addText('Suivi du fonds', { x: M + 0.3, y: 2.3, w: 11, h: 1, fontFace: FONT, fontSize: 44, bold: true, color: INK, margin: 0 });
-      s.addText(c.label, { x: M + 0.3, y: 3.3, w: 11, h: 0.7, fontFace: FONT, fontSize: 26, color: BLUE, margin: 0 });
+      s.addText(c.label, { x: M + 0.3, y: 3.3, w: 11, h: 0.7, fontFace: FONT, fontSize: 26, color: DEEP, margin: 0 });
       s.addText(`Données au ${F.date(ctx.ref)} · ${F.int(t.n)} exemplaires`, { x: M + 0.3, y: 4.1, w: 11, h: 0.5, fontFace: FONT, fontSize: 16, color: MUTED, margin: 0 });
     }
 
@@ -218,7 +220,7 @@ window.SF = window.SF || {};
       k.forEach(([v, l, sub], i) => {
         const x = M + i * (bw + 0.3);
         s.addShape(pptx.ShapeType.rect, { x, y: 1.4, w: bw, h: 1.9, fill: { color: LIGHT }, line: { color: LIGHT } });
-        s.addText(v, { x: x + 0.25, y: 1.55, w: bw - 0.5, h: 0.85, fontFace: FONT, fontSize: 38, bold: true, color: BLUE, margin: 0 });
+        s.addText(v, { x: x + 0.25, y: 1.55, w: bw - 0.5, h: 0.85, fontFace: FONT, fontSize: 38, bold: true, color: DEEP, margin: 0 });
         s.addText(l, { x: x + 0.25, y: 2.4, w: bw - 0.5, h: 0.4, fontFace: FONT, fontSize: 16, color: INK, margin: 0 });
         s.addText(sub, { x: x + 0.25, y: 2.8, w: bw - 0.5, h: 0.35, fontFace: FONT, fontSize: 12, color: MUTED, margin: 0 });
       });
@@ -234,7 +236,7 @@ window.SF = window.SF || {};
       s.addChart(pptx.ChartType.bar, data, {
         x: M, y: 1.8, w: W - 2 * M, h: Math.min(4.9, 1.2 + rows.length * 0.9),
         barDir: 'bar', barGrouping: 'percentStacked', barGapWidthPct: 40,
-        chartColors: ['184F95', '2A78D6', '6DA7EC', 'B7D3F6', 'C9C7BF'],
+        chartColors: ['234E62', '487D96', '7FA8BB', 'B9D1DC', 'C9C7BF'],
         catAxisLabelFontSize: 13, catAxisLabelFontFace: FONT, catAxisOrientation: 'maxMin',
         valAxisHidden: true, valGridLine: { style: 'none' }, catGridLine: { style: 'none' },
         showLegend: true, legendPos: 't', legendFontSize: 12, legendFontFace: FONT,
@@ -252,13 +254,13 @@ window.SF = window.SF || {};
         { name: 'Part des prêts', labels: fs.map(f => f.name), values: fs.map(f => f.partPrets) }
       ], {
         x: M, y: 1.8, w: 7.2, h: 4.8, barDir: 'col', barGrouping: 'clustered', barGapWidthPct: 60,
-        chartColors: ['2A78D6', 'EB6834'], catAxisLabelFontSize: 13, catAxisLabelFontFace: FONT,
+        chartColors: ['487D96', 'D9B600'], catAxisLabelFontSize: 13, catAxisLabelFontFace: FONT,
         valAxisHidden: true, valGridLine: { style: 'none' },
         showLegend: true, legendPos: 't', legendFontSize: 12, legendFontFace: FONT,
         showValue: true, dataLabelFormatCode: '0%', dataLabelFontSize: 12, dataLabelFontFace: FONT
       });
       const tbl = [[hd('Fonds'), hd('Docs'), hd('Prêts/doc.'), hd('Sortis 12 m.')]].concat(fs.map(f => [f.name, F.int(f.n), F.dec(f.rotation), F.pct(f.tauxActif)].map(v => ({ text: v, options: { fontSize: 12, color: INK } }))));
-      s.addTable(tbl, { x: 8.2, y: 2.2, w: 4.5, colW: [1.7, 0.8, 1.05, 0.95], fontFace: FONT, border: { type: 'solid', color: 'E3E1DA', pt: 0.75 }, valign: 'middle', rowH: 0.42 });
+      s.addTable(tbl, { x: 8.2, y: 2.2, w: 4.5, colW: [1.55, 0.8, 1.05, 1.1], fontFace: FONT, border: { type: 'solid', color: 'E3E1DA', pt: 0.75 }, valign: 'middle', rowH: 0.42 });
     }
 
     // 5. Âge des collections
@@ -267,7 +269,7 @@ window.SF = window.SF || {};
       const age = c.constats.find(x => /publiés avant 2010/.test(x));
       const s = base('Les documents anciens sortent-ils encore ?', age ? strip(age) : 'Prêts moyens sur l\'année par document, selon la date de publication.');
       s.addChart(pptx.ChartType.bar, [{ name: 'Prêts par document sur l\'année', labels: ps.map(r => `${r.label} (${F.int(r.n)} doc.)`), values: ps.map(r => Math.round(r.rot * 10) / 10) }], {
-        x: M, y: 2.0, w: W - 2 * M, h: 4.5, barDir: 'bar', barGapWidthPct: 45, chartColors: ['2A78D6'],
+        x: M, y: 2.0, w: W - 2 * M, h: 4.5, barDir: 'bar', barGapWidthPct: 45, chartColors: ['487D96'],
         catAxisLabelFontSize: 13, catAxisLabelFontFace: FONT, catAxisOrientation: 'maxMin',
         valAxisHidden: true, valGridLine: { style: 'none' }, showLegend: false,
         showValue: true, dataLabelFormatCode: '0.0', dataLabelFontSize: 12, dataLabelFontFace: FONT
@@ -280,7 +282,7 @@ window.SF = window.SF || {};
       const lab = { dormants: 'Retirer ?', doublons: 'Retirer un exemplaire ?', usure: 'Remplacer ?', demande: 'Renforcer ?', series: 'Compléter ?', regul: 'Régulariser' };
       const tbl = [[hd('Piste'), hd('Volume'), hd('Critère')]].concat(c.pistes.filter(p => p.rows.length).map(p => [
         { text: lab[p.id], options: { bold: true, fontSize: 14, color: INK } },
-        { text: `${F.int(p.rows.length)} ${p.kind === 'series' ? F.plural(p.rows.length, 'série') : 'ex.'}`, options: { fontSize: 14, color: BLUE, bold: true } },
+        { text: `${F.int(p.rows.length)} ${p.kind === 'series' ? F.plural(p.rows.length, 'série') : 'ex.'}`, options: { fontSize: 14, color: DEEP, bold: true } },
         { text: p.title + ' — ' + p.why, options: { fontSize: 12, color: MUTED } }
       ]));
       s.addTable(tbl, { x: M, y: 1.9, w: W - 2 * M, colW: [2.6, 1.5, W - 2 * M - 4.1], fontFace: FONT, border: { type: 'solid', color: 'E3E1DA', pt: 0.75 }, valign: 'middle', rowH: 0.62 });
