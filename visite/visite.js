@@ -210,6 +210,220 @@
       'render();'
   });
 
+  /* --------------------------------------------------------------- format-menu
+     Menu à branches : chaque élément « - [Libellé](#id) :: description » mène à la slide
+     <!-- branch: id -->. Un titre de lien « terrain » (#id "terrain") met l'élément en avant.
+     Les citations « > » sont les répliques du guide : la 1re au premier passage, la 2e au retour,
+     la 3e quand tout a été vu. <!-- parent: menu --> ajoute « Revenir au menu principal ».     */
+  var SEEN_KEY = 'suivi-fonds-visite-vues';
+  var seen = {};
+  try { seen = JSON.parse(localStorage.getItem(SEEN_KEY) || '{}') || {}; } catch (e) { seen = {}; }
+  function markSeen(id) { if (!id || seen[id]) return; seen[id] = 1; try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch (e) { /* rien */ } }
+  window.SFV.seen = function (id) { return !!seen[id]; };
+  window.SFV.resetSeen = function () { seen = {}; try { localStorage.removeItem(SEEN_KEY); } catch (e) { /* rien */ } };
+
+  MLS.formats.register({
+    id: 'format-menu',
+    name: 'Menu à branches',
+    icon: 'bi-signpost-split',
+    category: 'Navigation',
+    description: 'Boutons qui mènent chacun à une partie (« - [Libellé](#id) :: description »). Les parties vues sont cochées ; la fin de chaque partie ramène au menu.',
+    i18n: { fr: { seen: 'vu', done: 'J’ai fini la visite', back: 'Revenir au menu principal', all: 'Tout est vu !' } },
+    template: '<div class="mn">' +
+      '{{#title}}<h2 class="mls-title">{{{titleHtml}}}</h2>{{/title}}' +
+      '<div class="mn-guide">{{#character}}<div class="mn-who">{{{avatar}}}</div>{{/character}}<div class="mn-bubble" data-mls-speak="always" data-mls-speak-role="{{role}}"></div></div>' +
+      '<div class="mn-grid"></div>' +
+      '<div class="mn-actions"></div></div>',
+    css: ':scope .mn { max-width: 860px; margin: 0 auto; }\n' +
+      ':scope .mn-guide { display: flex; gap: .9rem; align-items: flex-end; margin-bottom: 1.2rem; }\n' +
+      ':scope .mn-who { flex: none; } :scope .mn-who .mls-avatar { width: 84px; height: 84px; }\n' +
+      ':scope .mn-bubble { background: var(--mls-surface); border-radius: 20px; border-bottom-left-radius: 6px; padding: .8rem 1.1rem; box-shadow: var(--mls-shadow); font-size: clamp(1rem, 1.9cqw, 1.18rem); line-height: 1.5; }\n' +
+      ':scope .mn-bubble p { margin: 0; }\n' +
+      ':scope .mn-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }\n' +
+      ':scope .mn-item { position: relative; display: flex; gap: .8rem; align-items: center; text-align: left; width: 100%; border: 2px solid transparent; background: var(--mls-surface); color: inherit;' +
+      ' border-radius: 16px; padding: .85rem 1rem; box-shadow: var(--mls-shadow); cursor: pointer; font: inherit; transition: transform .15s, border-color .15s; }\n' +
+      ':scope .mn-item:hover, :scope .mn-item:focus-visible { border-color: var(--mls-primary); transform: translateY(-2px); }\n' +
+      ':scope .mn-ico { font-size: 1.7rem; line-height: 1; flex: none; width: 2.2rem; text-align: center; }\n' +
+      ':scope .mn-txt { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }\n' +
+      ':scope .mn-txt strong { font-size: 1.02rem; }\n' +
+      ':scope .mn-txt small { opacity: .75; font-size: .86rem; line-height: 1.35; }\n' +
+      ':scope .mn-seen { position: absolute; top: .45rem; right: .6rem; font-size: .72rem; font-weight: 700; color: var(--mls-primary); display: none; }\n' +
+      ':scope .mn-item.is-seen .mn-seen { display: inline-flex; gap: .2rem; align-items: center; }\n' +
+      ':scope .mn-item.is-seen { opacity: .8; }\n' +
+      /* mise en avant « terrain » : pleine largeur, fond doré, comme une appli */
+      ':scope .mn-item.mn-terrain { grid-column: 1 / -1; background: linear-gradient(120deg, var(--mls-secondary), #f3dc6b); color: #1f2933; padding: 1.05rem 1.2rem; }\n' +
+      ':scope .mn-item.mn-terrain .mn-ico { font-size: 2.1rem; }\n' +
+      ':scope .mn-item.mn-terrain strong { font-size: 1.12rem; }\n' +
+      ':scope .mn-item.mn-terrain .mn-seen { color: #1f2933; }\n' +
+      ':scope .mn-actions { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: center; margin-top: 1.3rem; }\n' +
+      '@container slide (max-width: 640px) { :scope .mn-grid { grid-template-columns: 1fr; } :scope .mn-who .mls-avatar { width: 56px; height: 56px; } }',
+    js: 'var grid = root.querySelector(".mn-grid"), bubble = root.querySelector(".mn-bubble"), acts = root.querySelector(".mn-actions");\n' +
+      'var img = root.querySelector(".mn-who .mls-avatar");\n' +
+      'var items = data.items.map(function (it) {\n' +
+      '  var d = document.createElement("div"); d.innerHTML = it.term;\n' +
+      '  var a = d.querySelector("a"); if (!a) return null;\n' +
+      '  var label = a.textContent.trim(), m = label.match(/^(\\p{Extended_Pictographic}\\uFE0F?)\\s*(.*)$/u);\n' +
+      '  return { target: (a.getAttribute("href") || "").replace(/^#/, ""), ico: m ? m[1] : "", label: m ? m[2] : label, desc: it.def, variant: a.getAttribute("title") || "" };\n' +
+      '}).filter(Boolean);\n' +
+      'grid.innerHTML = items.map(function (x) {\n' +
+      '  return "<button type=\\"button\\" class=\\"mn-item" + (x.variant ? " mn-" + x.variant : "") + "\\" data-go=\\"" + ctx.escape(x.target) + "\\">" +\n' +
+      '    (x.ico ? "<span class=\\"mn-ico\\" aria-hidden=\\"true\\">" + x.ico + "</span>" : "") +\n' +
+      '    "<span class=\\"mn-txt\\"><strong>" + ctx.escape(x.label) + "</strong>" + (x.desc ? "<small>" + x.desc + "</small>" : "") + "</span>" +\n' +
+      '    "<span class=\\"mn-seen\\"><i class=\\"bi bi-check-circle-fill\\"></i> " + ctx.t("seen") + "</span></button>";\n' +
+      '}).join("");\n' +
+      'var parent = data.meta.parent;\n' +
+      'acts.innerHTML = parent ? "<button type=\\"button\\" class=\\"mls-btn mls-btn-ghost\\" data-go=\\"" + ctx.escape(parent) + "\\"><i class=\\"bi bi-arrow-left\\"></i> " + ctx.t("back") + "</button>"\n' +
+      '  : "<button type=\\"button\\" class=\\"mls-btn mls-btn-ghost\\" data-finish><i class=\\"bi bi-flag\\"></i> " + ctx.t("done") + "</button>";\n' +
+      'function refresh() {\n' +
+      '  var n = 0;\n' +
+      '  grid.querySelectorAll(".mn-item").forEach(function (b) { var s = window.SFV.seen(b.getAttribute("data-go")); b.classList.toggle("is-seen", s); if (s) n++; });\n' +
+      '  var q = data.quotes, k = n === 0 ? 0 : (n >= items.length && q[2] ? 2 : 1);\n' +
+      '  var line = q[Math.min(k, q.length - 1)];\n' +
+      '  if (line) { bubble.innerHTML = line.html; if (img) ctx.setExpression(img, line.expression || "happy"); window.SFV.applyName(window.SFV.getName()); }\n' +
+      '}\n' +
+      'root.addEventListener("click", function (e) {\n' +
+      '  var g = e.target.closest("[data-go]"); if (g) { window.SFV.go(g.getAttribute("data-go")); return; }\n' +
+      '  if (e.target.closest("[data-finish]")) window.SFV.finish();\n' +
+      '});\n' +
+      'ctx.onEnter(refresh);\n' +
+      'refresh();'
+  });
+
+  /* --------------------------------------------------------------- format-scan
+     Simulation : un téléphone, une étiquette à scanner, la fiche qui s'ouvre, une décision
+     à prendre ; le personnage réagit. Fiche : « - **Titre** :: … ». Choix : « > Libellé (expression) :: réaction ». */
+  MLS.formats.register({
+    id: 'format-scan',
+    name: 'Simulation : scanner en rayon',
+    icon: 'bi-upc-scan',
+    category: 'Mises en situation',
+    description: 'Un téléphone à manipuler : scanner l’étiquette, voir la fiche, prendre une photo, décider. Le personnage réagit à chaque choix.',
+    i18n: { fr: { scan: 'Scanner', scanning: 'Lecture…', photo: 'Photo', photoOk: 'Photo ajoutée', decide: 'Ta décision', search: 'Code-barres, cote ou titre', again: 'Recommencer' } },
+    template: '<div class="sc">' +
+      '{{#title}}<h2 class="mls-title">{{{titleHtml}}}</h2>{{/title}}' +
+      '<div class="sc-stage">' +
+      '<div class="sc-phone" aria-label="Téléphone simulé"><div class="sc-notch"></div><div class="sc-screen">' +
+      '<div class="sc-bar"><i class="bi bi-search"></i><span class="sc-q">{{t.search}}</span><i class="bi bi-upc-scan"></i></div>' +
+      '<div class="sc-cam"><svg class="sc-code" viewBox="0 0 220 70" aria-hidden="true"></svg><div class="sc-laser"></div><div class="sc-num"></div></div>' +
+      '<button type="button" class="mls-btn sc-go"><i class="bi bi-upc-scan"></i> {{t.scan}}</button>' +
+      '<div class="sc-fiche" hidden><dl class="sc-dl">{{#items}}<div><dt>{{{term}}}</dt><dd>{{{def}}}</dd></div>{{/items}}</dl>' +
+      '<p class="sc-h">{{t.decide}}</p><div class="sc-choices"></div>' +
+      '<button type="button" class="sc-photo"><i class="bi bi-camera"></i> <span>{{t.photo}}</span></button></div>' +
+      '</div></div>' +
+      '<div class="sc-coach">{{#character}}<div class="sc-who">{{{avatar}}}</div>{{/character}}<div class="sc-bubble" data-mls-speak="always" data-mls-speak-role="{{role}}">{{{text}}}</div></div>' +
+      '</div></div>',
+    css: ':scope .sc { max-width: 900px; margin: 0 auto; }\n' +
+      ':scope .sc-stage { display: grid; grid-template-columns: 280px 1fr; gap: 1.6rem; align-items: center; }\n' +
+      ':scope .sc-phone { position: relative; background: #1f2933; border-radius: 34px; padding: 14px 10px; box-shadow: var(--mls-shadow); }\n' +
+      ':scope .sc-notch { width: 70px; height: 6px; border-radius: 6px; background: #3a4752; margin: 0 auto 10px; }\n' +
+      ':scope .sc-screen { background: #f3f6f7; color: #1f2933; border-radius: 22px; min-height: 430px; padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }\n' +
+      ':scope .sc-bar { display: flex; gap: 8px; align-items: center; background: #fff; border-radius: 10px; padding: 8px 10px; font-size: .8rem; color: #6b7378; }\n' +
+      ':scope .sc-bar .sc-q { flex: 1; }\n' +
+      ':scope .sc-cam { position: relative; background: #fff; border-radius: 12px; padding: 14px 10px 8px; border: 2px solid var(--mls-secondary); }\n' +
+      ':scope .sc-code { width: 100%; height: 60px; display: block; }\n' +
+      ':scope .sc-num { text-align: center; font: 600 .78rem/1.4 ui-monospace, monospace; letter-spacing: .08em; }\n' +
+      ':scope .sc-laser { position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: #e5484d; box-shadow: 0 0 8px #e5484d; opacity: 0; }\n' +
+      ':scope .sc-cam.is-scanning .sc-laser { opacity: 1; animation: sc-sweep .9s ease-in-out 2; }\n' +
+      '@keyframes sc-sweep { 0%, 100% { top: 18%; } 50% { top: 70%; } }\n' +
+      ':scope .sc-go { align-self: center; }\n' +
+      ':scope .sc-fiche { background: #fff; border-radius: 12px; padding: 10px; animation: sc-up .35s ease both; display: flex; flex-direction: column; gap: 8px; }\n' +
+      '@keyframes sc-up { from { opacity: 0; transform: translateY(14px); } }\n' +
+      ':scope .sc-dl { margin: 0; display: grid; gap: 4px; font-size: .8rem; }\n' +
+      ':scope .sc-dl div { display: flex; gap: 6px; } :scope .sc-dl dt { font-weight: 700; flex: none; } :scope .sc-dl dd { margin: 0; }\n' +
+      ':scope .sc-h { margin: 4px 0 0; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; opacity: .7; }\n' +
+      ':scope .sc-choices { display: flex; flex-wrap: wrap; gap: 6px; }\n' +
+      ':scope .sc-choices button, :scope .sc-photo { border: 1px solid #d6dde1; background: #fff; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: .82rem; cursor: pointer; color: #1f2933; }\n' +
+      ':scope .sc-choices button.on { background: var(--mls-primary); border-color: var(--mls-primary); color: #fff; font-weight: 700; }\n' +
+      ':scope .sc-photo { align-self: flex-start; }\n' +
+      ':scope .sc-photo.on { background: #e5f6ec; border-color: #2e7d5b; color: #1f5f43; }\n' +
+      ':scope .sc-flash { position: absolute; inset: 0; background: #fff; border-radius: 34px; animation: sc-flash .45s ease forwards; pointer-events: none; }\n' +
+      '@keyframes sc-flash { from { opacity: .95; } to { opacity: 0; } }\n' +
+      ':scope .sc-coach { display: flex; gap: .9rem; align-items: flex-end; }\n' +
+      ':scope .sc-who { flex: none; } :scope .sc-who .mls-avatar { width: 110px; height: 110px; }\n' +
+      ':scope .sc-bubble { background: var(--mls-surface); border-radius: 22px; border-bottom-left-radius: 6px; padding: 1rem 1.2rem; box-shadow: var(--mls-shadow); font-size: clamp(1rem, 1.9cqw, 1.2rem); line-height: 1.5; }\n' +
+      ':scope .sc-bubble p:last-child { margin: 0; }\n' +
+      ':scope .sc-bubble.pop { animation: sc-up .3s ease both; }\n' +
+      '@container slide (max-width: 640px) { :scope .sc-stage { grid-template-columns: 1fr; } :scope .sc-phone { max-width: 290px; margin: 0 auto; } :scope .sc-screen { min-height: 0; }' +
+      ' :scope .sc-coach { order: -1; } :scope .sc-who .mls-avatar { width: 60px; height: 60px; } }\n' +
+      '@media (prefers-reduced-motion: reduce) { :scope .sc-cam.is-scanning .sc-laser, :scope .sc-fiche, :scope .sc-flash, :scope .sc-bubble.pop { animation: none; } }',
+    js: 'var cam = root.querySelector(".sc-cam"), go = root.querySelector(".sc-go"), fiche = root.querySelector(".sc-fiche");\n' +
+      'var bubble = root.querySelector(".sc-bubble"), img = root.querySelector(".sc-who .mls-avatar"), phone = root.querySelector(".sc-phone");\n' +
+      // le code affiché : la ligne « Code » de la fiche, sinon un numéro d'exemplaire fictif
+      'var codeItem = data.items.filter(function (i) { return /code/i.test(i.termText); })[0];\n' +
+      'var code = codeItem ? ctx.escape((codeItem.def || "").replace(/<[^>]+>/g, "")).trim() : "31909000000000";\n' +
+      'root.querySelector(".sc-num").textContent = code;\n' +
+      // barres pseudo-Codabar, dessinées à partir des chiffres
+      'var svg = root.querySelector(".sc-code"), x = 6, bars = "";\n' +
+      '("A" + code + "B").split("").forEach(function (ch, k) { var c = ch.charCodeAt(0); for (var j = 0; j < 4; j++) { var w = ((c >> j) & 1) ? 3.2 : 1.4; bars += "<rect x=\\"" + x.toFixed(1) + "\\" y=\\"0\\" width=\\"" + w + "\\" height=\\"60\\" fill=\\"#1f2933\\"/>"; x += w + ((c >> (j + 1)) & 1 ? 2.6 : 1.4); } x += 2; });\n' +
+      'svg.setAttribute("viewBox", "0 0 " + Math.ceil(x + 6) + " 60"); svg.innerHTML = bars;\n' +
+      // choix : « Libellé (expression) :: réaction »
+      'var choices = data.quotes.map(function (q) { var m = q.text.match(/^\\s*(.+?)\\s*(?:\\((\\w+)\\))?\\s*::\\s*([\\s\\S]+)$/); return m ? { label: m[1], expr: m[2] || "neutral", text: m[3] } : null; }).filter(Boolean);\n' +
+      'var box = root.querySelector(".sc-choices");\n' +
+      'box.innerHTML = choices.map(function (c, i) { return "<button type=\\"button\\" data-i=\\"" + i + "\\">" + ctx.escape(c.label) + "</button>"; }).join("");\n' +
+      'function say(html, expr) { bubble.classList.remove("pop"); void bubble.offsetWidth; bubble.innerHTML = html; bubble.classList.add("pop"); if (img) ctx.setExpression(img, expr || "neutral"); ctx.announce(bubble.textContent); ctx.speak(bubble); }\n' +
+      'go.addEventListener("click", function () {\n' +
+      '  go.disabled = true; go.innerHTML = "<i class=\\"bi bi-hourglass-split\\"></i> " + ctx.t("scanning"); cam.classList.add("is-scanning");\n' +
+      '  setTimeout(function () { cam.classList.remove("is-scanning"); if (navigator.vibrate) navigator.vibrate(60); go.hidden = true; fiche.hidden = false; root.querySelector(".sc-q").textContent = code;\n' +
+      '    if (data.meta["apres-scan"]) say("<p>" + ctx.escape(data.meta["apres-scan"]) + "</p>", "happy"); }, 1300);\n' +
+      '});\n' +
+      'box.addEventListener("click", function (e) { var b = e.target.closest("button"); if (!b) return; box.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });\n' +
+      '  var c = choices[+b.getAttribute("data-i")]; say("<p>" + ctx.escape(c.text) + "</p>", c.expr); });\n' +
+      'root.querySelector(".sc-photo").addEventListener("click", function (e) { var b = e.currentTarget; var f = document.createElement("div"); f.className = "sc-flash"; phone.appendChild(f); setTimeout(function () { f.remove(); }, 500);\n' +
+      '  b.classList.add("on"); b.querySelector("span").textContent = ctx.t("photoOk"); if (data.meta["apres-photo"]) say("<p>" + ctx.escape(data.meta["apres-photo"]) + "</p>", "encouraging"); });'
+  });
+
+  /* ------------------------------------------------------- navigation par branches
+     <!-- branch: id --> ouvre une partie (son <!-- parent: … --> vaut « menu » par défaut) ;
+     la partie s'arrête à la slide qui ouvre une autre partie, à un menu ou à une slide <!-- id: … -->.
+     Fin de partie -> retour au menu parent ; « Précédent » au début d'une partie -> menu parent.
+     Sur un menu, « Suivant » mène à la première partie pas encore vue. <!-- id: fin --> = conclusion. */
+  function installBranching(player) {
+    var slides = player.course.slides, n = slides.length;
+    var byId = {}, owner = [], cur = null;
+    slides.forEach(function (s, i) {
+      var id = s.meta.branch || s.meta.id;
+      if (id && byId[id] == null) byId[id] = i;
+      if (s.format === 'format-menu' || (s.meta.id && !s.meta.branch)) cur = null;
+      if (s.meta.branch) cur = { id: s.meta.branch, parent: s.meta.parent || 'menu', start: i };
+      owner[i] = cur;
+      // sommaire : une entrée par partie et par menu
+      if (!s.meta.chapter && (s.meta.branch || s.format === 'format-menu')) s.meta.chapter = s.title || s.meta.branch;
+    });
+    player.computeChapters();
+    player.renderToc();
+
+    function go(id) { if (byId[id] != null) player.goTo(byId[id]); }
+    function finish() { if (byId.fin != null) player.goTo(byId.fin); else player.openEnd(); }
+    window.SFV.go = go;
+    window.SFV.finish = finish;
+
+    var next0 = player.next, prev0 = player.prev;
+    player.next = function () {
+      var i = this.index, s = slides[i];
+      if (s.meta.id === 'fin') return this.openEnd();
+      if (s.format === 'format-menu') {
+        var todo = [].slice.call(this.slideEls[i].querySelectorAll('.mn-item')).filter(function (b) { return !window.SFV.seen(b.getAttribute('data-go')); })[0];
+        if (todo) return go(todo.getAttribute('data-go'));
+        return s.meta.parent ? go(s.meta.parent) : finish();
+      }
+      var o = owner[i];
+      if (o && (i + 1 >= n || owner[i + 1] !== o)) return go(o.parent);
+      return next0.call(this);
+    };
+    player.prev = function () {
+      var i = this.index, s = slides[i], o = owner[i];
+      if (s.meta.id === 'fin') return go('menu');
+      if (s.format === 'format-menu' && s.meta.parent) return go(s.meta.parent);
+      if (o && o.start === i) return go(o.parent);
+      return prev0.call(this);
+    };
+    var onSlide = player.opts.onSlide;
+    player.opts.onSlide = function (i) {
+      if (slides[i] && slides[i].meta.branch) markSeen(slides[i].meta.branch);
+      if (onSlide) onSlide(i);
+    };
+  }
+
   /* ------------------------------------------------------------------ lancement */
   function marks(md) {
     // {prenom} -> « Marie » ; {, prenom} -> « , Marie » ; sans prénom, la marque entière disparaît
@@ -234,6 +448,7 @@
     var openEnd = player.openEnd;
     player.openEnd = function () { this.gradable = {}; this.scores = {}; return openEnd.apply(this, arguments); };
     player.load(md, { welcome: true });
+    installBranching(player);
     applyName(getName());
     document.getElementById('loading').hidden = true;
   }).catch(function (e) {
