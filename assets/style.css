@@ -454,3 +454,13 @@ ul.why li { margin: 1px 0; }
 .jchip.on span { color: inherit; opacity: .75; }
 .jchip:disabled { opacity: .45; cursor: default; }
 .prio-card > .btn { margin-top: 4px; }
+
+/* carte ouverte : pleine largeur et soudée à sa liste, pour qu'on sache à quoi correspond la liste */
+.pcards > .pcard.open { grid-column: 1 / -1; border-bottom-left-radius: 0; border-bottom-right-radius: 0; outline: 0;
+  border: 2px solid var(--tone); border-left-width: 4px; border-bottom: 0; }
+.pcards > .pcard.open + .plist { margin-top: -12px; border: 2px solid var(--tone-open, var(--accent)); border-left-width: 4px; border-top: 1px dashed var(--line);
+  border-top-left-radius: 0; border-top-right-radius: 0; }
+.pcards > .pcard.retirer.open + .plist { --tone-open: var(--retirer); }
+.pcards > .pcard.remplacer.open + .plist { --tone-open: var(--remplacer); }
+.pcards > .pcard.renforcer.open + .plist { --tone-open: var(--renforcer); }
+.pcards > .pcard.regul.open + .plist { --tone-open: var(--regul); }
