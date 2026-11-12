@@ -212,3 +212,40 @@ tr.prio td { background: var(--warn-bg); }
   .tab { padding: 10px 9px; }
   .card { padding: 14px; }
 }
+
+/* décisions */
+.drop-hint { font-size: .85rem; margin-top: 6px; }
+.ltools { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; justify-content: space-between; padding: 8px 10px; font-size: .88rem; }
+.ltools label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.dcell { min-width: 150px; }
+.dec { display: flex; flex-wrap: wrap; gap: 4px; }
+.dec button { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); padding: 4px 9px; border-radius: 6px; font-size: .8rem; cursor: pointer; white-space: nowrap; }
+.dec button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.dec button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.dmeta { display: block; color: var(--muted); margin-top: 4px; }
+tr.done td:not(.dcell) { opacity: .5; }
+tr.done td { background: var(--surface-2); }
+tr.prio.done td { background: var(--surface-2); }
+.prog { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.prog span { display: block; height: 100%; background: var(--gold); border-radius: 3px; }
+.pc-done { margin: -2px 0 0; font-size: .82rem; color: var(--ink-2); min-height: 0; }
+.pc-done:empty { display: none; }
+.savebox { border-left: 4px solid var(--gold); }
+.savebox p, .savebox li { color: var(--ink-2); font-size: .92rem; }
+.savebox ol { margin: 8px 0 12px; padding-left: 20px; }
+.savebox li { margin: 4px 0; }
+
+@media (max-width: 720px) {
+  /* les listes deviennent des fiches, plus pratiques en rayon */
+  .tl-list thead { display: none; }
+  .tl-list, .tl-list tbody, .tl-list tr, .tl-list td { display: block; width: 100%; }
+  .tl-list tr { border-bottom: 1px solid var(--line); padding: 10px 6px; display: flex; flex-wrap: wrap; gap: 2px 14px; }
+  .tl-list td { border: 0; padding: 2px 4px; flex: 1 1 100%; }
+  .tl-list td.cote { font-weight: 600; }
+  .tl-list td.num, .tl-list td[data-l="Statut"], .tl-list td[data-l="Fonds"] { flex: 0 0 auto; width: auto; text-align: left; font-size: .85rem; }
+  .tl-list td.num::before, .tl-list td[data-l="Fonds"]::before { content: attr(data-l) " : "; color: var(--muted); font-size: .8rem; }
+  .tl-list td.dcell { margin-top: 6px; }
+  .dec button { padding: 8px 12px; font-size: .88rem; }
+  tr.done td { background: transparent; }
+  tr.done { background: var(--surface-2); }
+}

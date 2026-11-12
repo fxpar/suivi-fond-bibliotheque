@@ -137,6 +137,8 @@ window.SF = window.SF || {};
   SF.readFile = async function (file) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array', cellDates: true, codepage: 65001 });
+    // Classeur de pistes déjà annoté : on en tire les décisions, pas des exemplaires
+    if (SF.isDecisionBook(wb)) return { items: [], sheets: [], decisions: SF.readDecisionBook(wb) };
     const items = [];
     const sheets = [];
     for (const name of wb.SheetNames) {

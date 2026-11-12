@@ -15,7 +15,7 @@
       <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="6" width="5" height="20" rx="1" fill="#ffffff"/><rect x="11" y="4" width="5" height="22" rx="1" fill="#e4eef2"/><rect x="18" y="9" width="5" height="17" rx="1" fill="#b9d1dc"/><rect x="24" y="8" width="4" height="18" rx="1" transform="rotate(12 26 17)" fill="#d9b600"/></svg>
       <div>
         <h1>Suivi de fonds</h1>
-        <p class="tag">Vos extractions restent sur votre ordinateur : rien n'est envoyé ni conservé.</p>
+        <p class="tag">Vos extractions restent sur votre ordinateur : rien n'est envoyé.</p>
       </div>
     </div>
     <div class="top-actions" id="topActions" hidden>
@@ -34,6 +34,7 @@
       </span>
       <strong>Déposez votre feuille de suivi de fonds</strong>
       <span>ou cliquez pour la choisir — Excel, ODS ou CSV, plusieurs onglets ou fichiers acceptés</span>
+      <span class="drop-hint">Vous avez un classeur de pistes déjà annoté ? Déposez-le avec l'extraction pour retrouver vos décisions.</span>
     </label>
     <div class="intro">
       <div>
@@ -79,6 +80,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="assets/decisions.js"></script>
 <script src="assets/parse.js"></script>
 <script src="assets/analyse.js"></script>
 <script src="assets/exports.js"></script>

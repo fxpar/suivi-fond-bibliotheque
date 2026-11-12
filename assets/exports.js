@@ -29,15 +29,7 @@ window.SF = window.SF || {};
   const stamp = d => d.toISOString().slice(0, 10);
   const strip = h => h.replace(/<[^>]+>/g, '');
 
-  const SHEETS = {
-    dormants: 'Retirer - sans prêt',
-    doublons: 'Retirer - doublons',
-    usure: 'Remplacer - usure',
-    demande: 'Renforcer - demande',
-    series: 'Séries à compléter',
-    regul: 'À régulariser'
-  };
-  const DECISIONS = '"À garder,À retirer,À remplacer,À réparer,À acheter,À transférer,À revoir"';
+  const SHEETS = SF.SHEETS;
   const C = { ink: '1F2933', blue: '487D96', blueL: 'E4EEF2', amber: 'FBF3CC', grey: 'F3F2EE', line: 'D9D7D0' };
 
   // ================= EXCEL =================
@@ -56,7 +48,8 @@ window.SF = window.SF || {};
     line([`Données au ${F.date(c.ctx.ref)} · ${F.int(c.items.length)} exemplaires · seuils : sans prêt depuis ${c.pistes.opts.dormant} mois, usure dès ${c.pistes.opts.usure} prêts, forte demande dès ${c.pistes.opts.demande} prêts/an`]);
     line([]);
     line(['Ces listes sont des pistes à vérifier en rayon, pas des décisions automatiques.'], { bold: true });
-    line(['Chaque ligne indique son motif. Remplissez la colonne « Décision » (liste déroulante) et, si besoin, « Commentaire ». Les lignes surlignées demandent une attention particulière (tome d\'une série active, titre réservé, tome 1 absent).']);
+    line(['Chaque ligne indique son motif. Remplissez la colonne « Décision » (liste déroulante, saisie libre possible) et, si besoin, « Commentaire ». Les lignes surlignées demandent une attention particulière (tome d\'une série active, titre réservé, tome 1 absent).']);
+    line(['Ce classeur sert de sauvegarde : redéposez-le dans l\'outil (seul ou avec une nouvelle extraction) pour retrouver les décisions. Gardez les noms d\'onglets et les colonnes Fonds, Cote, Titre, Série et Code-barres.']);
     line([]);
     const hr = line(['Onglet', 'Lignes', 'Ce qu\'il contient'], { bold: true });
     hr.eachCell(cl => { cl.fill = fill(C.blueL); });
@@ -100,7 +93,7 @@ window.SF = window.SF || {};
       let cols;
       if (p.kind === 'series') {
         cols = [
-          multi && { header: 'Fonds', key: 'fonds', width: 18 },
+          { header: 'Fonds', key: 'fonds', width: 18 },
           { header: 'Cote', key: 'cote', width: 14 },
           { header: 'Série', key: 'serie', width: 36 },
           { header: 'Tomes présents', key: 'pres', width: 20 },
@@ -108,18 +101,19 @@ window.SF = window.SF || {};
           { header: 'Dans un autre fonds', key: 'ail', width: 24 },
           { header: 'Prêts an (série)', key: 'pa', width: 14 },
           { header: 'Motif', key: 'motif', width: 26 },
-          { header: 'Décision', key: 'dec', width: 14 },
+          { header: 'Décision', key: 'dec', width: 16 },
+          { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
           { header: 'Commentaire', key: 'com', width: 34 }
         ].filter(Boolean);
         ws.columns = cols;
         rows.sort((a, b) => a.prio - b.prio || cmp(a.serie.cote, b.serie.cote) || cmp(a.serie.nom, b.serie.nom));
         for (const r of rows) {
-          const row = ws.addRow({ fonds: r.serie.fonds, cote: r.serie.cote, serie: r.serie.nom, pres: SF.compact(r.serie.tomes), manq: SF.compact(r.missing), ail: r.ailleurs, pa: r.serie.pa, motif: r.motif });
+          const row = ws.addRow({ fonds: r.serie.fonds, cote: r.serie.cote, serie: r.serie.nom, pres: SF.compact(r.serie.tomes), manq: SF.compact(r.missing), ail: r.ailleurs, pa: r.serie.pa, motif: r.motif, ...decOf(p, r) });
           if (r.prio === 0) row.getCell('motif').fill = fill(C.amber);
         }
       } else {
         cols = [
-          multi && { header: 'Fonds', key: 'fonds', width: 16 },
+          { header: 'Fonds', key: 'fonds', width: 16 },
           { header: 'Cote', key: 'cote', width: 14 },
           { header: 'Titre', key: 'titre', width: 40 },
           { header: 'Série', key: 'serie', width: 22 },
@@ -134,7 +128,8 @@ window.SF = window.SF || {};
           { header: 'Entrée', key: 'crea', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
           { header: 'Motif', key: 'motif', width: 34 },
           { header: 'À noter', key: 'note', width: 40 },
-          { header: 'Décision', key: 'dec', width: 14 },
+          { header: 'Décision', key: 'dec', width: 16 },
+          { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
           { header: 'Commentaire', key: 'com', width: 30 }
         ].filter(Boolean);
         ws.columns = cols;
@@ -145,7 +140,7 @@ window.SF = window.SF || {};
           const row = ws.addRow({
             fonds: it.fonds, cote: it.cote, titre: it.titre, serie: it.serie, tome: it.tome, auteur: it.auteur.split(/[,;]\s*(?=[A-ZÀ-Ý])/)[0],
             cb: it.cb, statut: it.statut.replace(/\s*\([A-Z]+\)$/, ''), dernier: utc(it.dernier), pa: it.pa, pv: it.pv, pub: it.pub, crea: utc(it.crea),
-            motif: r.motif, note: r.note
+            motif: r.motif, note: r.note, ...decOf(p, r)
           });
           if (r.prio === 0 || r.flag) row.getCell('note').fill = fill(C.amber);
         }
@@ -153,7 +148,10 @@ window.SF = window.SF || {};
       styleHeader(ws);
       const decCol = ws.getColumn('dec').number;
       for (let i = 2; i <= ws.rowCount; i++) {
-        ws.getRow(i).getCell(decCol).dataValidation = { type: 'list', allowBlank: true, formulae: [DECISIONS] };
+        const cell = ws.getRow(i).getCell(decCol);
+        // liste propre à l'onglet, mais saisie libre acceptée (showErrorMessage: false)
+        cell.dataValidation = { type: 'list', allowBlank: true, showErrorMessage: false, formulae: [`"${SF.CHOICES[p.id].join(',')}"`] };
+        if (cell.value) cell.fill = fill(C.blueL);
         ws.getRow(i).alignment = { vertical: 'top', wrapText: true };
       }
       ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
@@ -163,6 +161,12 @@ window.SF = window.SF || {};
     SF.download(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `pistes-${slug(c.label)}-${stamp(c.ctx.ref)}.xlsx`);
   };
 
+  const decOf = (p, r) => {
+    const d = SF.dec.get(SF.decKey(p.id, r));
+    if (!d) return {};
+    const [y, m, j] = d.date.split('-').map(Number);
+    return { dec: d.d, com: d.com || null, dated: new Date(Date.UTC(y, m - 1, j)) };
+  };
   const cmp = (a, b) => String(a || '').localeCompare(String(b || ''), 'fr', { numeric: true });
   const fill = hex => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + hex } });
   const utc = d => (d ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null);

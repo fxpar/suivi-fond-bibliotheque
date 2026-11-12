@@ -6,9 +6,18 @@ Outil web pour analyser une extraction de fonds de bibliothèque (export SIGB en
 - **des pistes à examiner**, chacune motivée et réglable : *retirer ?* (sans prêt depuis N mois, doublons peu demandés), *remplacer ?* (exemplaires très empruntés), *renforcer ?* (forte demande, séries incomplètes), *régulariser* (perdus, contestés, en réparation) ;
 - **trois exports** : un classeur Excel prêt à annoter en rayon (une feuille par piste, triée par cote, colonne *Décision* à liste déroulante), une synthèse PowerPoint de 6 diapositives au plus pour la direction, un résumé texte à coller dans un assistant IA si on le souhaite.
 
+## Décisions de l'équipe
+
+Chaque ligne des listes propose des choix adaptés à la piste (garder, mettre en avant, transférer, retirer ; réparer, remplacer ; commander…).
+
+- Les choix sont gardés dans le navigateur (`localStorage`), sur cet appareil seulement : c'est un filet de sécurité, pas une sauvegarde.
+- L'export Excel reprend les décisions (colonnes *Décision*, *Décidé le*, *Commentaire*). C'est ce classeur qui fait foi : il se partage, se complète dans Excel (saisie libre acceptée).
+- Redéposer ce classeur, seul ou avec une nouvelle extraction, restitue les décisions. À la prochaine extraction, les titres déjà examinés apparaissent comme tels. La décision la plus récente l'emporte.
+- Les lignes sont reconnues par le code-barres (à défaut cote + titre), et les séries par fonds + nom de série.
+
 ## Confidentialité
 
-Tout se passe dans le navigateur. Le fichier n'est ni envoyé ni conservé : pas de serveur, pas de cookie, pas de mesure d'audience. Seules les bibliothèques JavaScript (SheetJS, ExcelJS, PptxGenJS) sont chargées depuis un CDN public.
+Tout se passe dans le navigateur. Le fichier n'est ni envoyé ni conservé : pas de serveur, pas de cookie, pas de mesure d'audience. Seules les décisions saisies sont gardées localement, sur l'appareil, et peuvent être effacées depuis l'onglet « Exporter ». Seules les bibliothèques JavaScript (SheetJS, ExcelJS, PptxGenJS) sont chargées depuis un CDN public.
 
 ## Colonnes reconnues
 

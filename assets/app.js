@@ -6,7 +6,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const ALL = '__tous__';
 
-  const state = { items: [], sheets: [], files: [], ctx: null, fonds: ALL, opts: Object.assign({}, SF.DEFAULTS), tab: 'overview', open: null, shown: 100 };
+  const state = { items: [], sheets: [], files: [], ctx: null, fonds: ALL, opts: Object.assign({}, SF.DEFAULTS), tab: 'overview', open: null, shown: 100, hideDone: false, c: null };
   SF.state = state;
 
   // ---------- chargement ----------
@@ -27,12 +27,19 @@
     const err = $('#loadError'); err.hidden = true;
     drop.classList.add('busy');
     try {
-      const items = [], sheets = [];
+      const items = [], sheets = [], decs = [];
       for (const f of files) {
         const r = await SF.readFile(f);
         items.push(...r.items); sheets.push(...r.sheets);
+        if (r.decisions) decs.push(...r.decisions);
       }
-      if (!items.length) throw new Error('Aucune ligne exploitable trouvée. Vérifiez que la feuille contient bien des en-têtes comme « Cote », « Titre », « Dernier emprunt », « Nb prêts année »…');
+      const nDec = decs.length ? SF.dec.merge(decs) : 0;
+      if (!items.length) {
+        if (decs.length && state.items.length) { render(); toast(`${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'} depuis le classeur annoté.`); return; }
+        if (decs.length) throw new Error(`Classeur de décisions lu (${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'}). Déposez maintenant l'extraction du fonds pour les retrouver dans les listes.`);
+        throw new Error('Aucune ligne exploitable trouvée. Vérifiez que la feuille contient bien des en-têtes comme « Cote », « Titre », « Dernier emprunt », « Nb prêts année »…');
+      }
+      if (nDec) setTimeout(() => toast(`${F.int(nDec)} ${F.plural(nDec, 'décision')} ${nDec > 1 ? 'reprises' : 'reprise'} depuis le classeur annoté.`), 300);
       Object.assign(state, { items, sheets, files: files.map(f => f.name), ctx: SF.context(items), fonds: ALL, open: null });
       $('#dropSection').hidden = true; $('#results').hidden = false; $('#topActions').hidden = false;
       render();
@@ -164,7 +171,12 @@
   }
 
   // ---------- à examiner ----------
+  const isDone = (p, r) => !!SF.dec.get(SF.decKey(p.id, r));
+  const doneCount = p => p.rows.reduce((a, r) => a + (isDone(p, r) ? 1 : 0), 0);
+  const doneLabel = p => { const n = doneCount(p); return n ? `${F.int(n)} ${F.plural(n, 'décidé')} sur ${F.int(p.rows.length)}` : ''; };
+
   function renderReview(c) {
+    state.c = c;
     const o = state.opts;
     const sel = (id, label, vals, unit) => `<label>${label} <select data-opt="${id}">${vals.map(v => `<option value="${v}"${v === o[id] ? ' selected' : ''}>${v} ${unit}</option>`).join('')}</select></label>`;
     let h = `<div class="settings">
@@ -173,19 +185,21 @@
       ${sel('usure', 'Usure au-delà de', [60, 80, 100, 120, 150], 'prêts')}
       ${sel('demande', 'Forte demande dès', [6, 8, 10, 12, 15], 'prêts/an')}
     </div>
-    <p class="disclaimer">Ce sont des <strong>pistes à vérifier en rayon</strong>, pas des décisions. L'outil ne voit ni l'état des documents, ni leur intérêt patrimonial, ni vos choix de politique documentaire.</p>`;
+    <p class="disclaimer">Ce sont des <strong>pistes à vérifier en rayon</strong>, pas des décisions. L'outil ne voit ni l'état des documents, ni leur intérêt patrimonial, ni vos choix de politique documentaire. Notez vos choix ligne par ligne : ils sont repris dans l'export Excel, qui sert de sauvegarde.</p>`;
     const groups = [...new Set(c.pistes.map(p => p.group))];
     for (const g of groups) {
       const ps = c.pistes.filter(p => p.group === g);
       h += `<h2 class="gh">${g}</h2><div class="pcards">`;
       for (const p of ps) {
         const open = state.open === p.id;
+        const nd = doneCount(p);
         h += `<article class="pcard ${p.tone}${open ? ' open' : ''}${p.rows.length ? '' : ' empty'}">
           <div class="pc-head">
             <span class="pc-n">${F.int(p.rows.length)}</span>
             <div><h3>${esc(p.title)}</h3><p>${esc(p.why)}</p></div>
           </div>
           <p class="pc-c">${esc(p.caution)}</p>
+          ${p.rows.length ? `<div class="prog" data-prog="${p.id}"${nd ? '' : ' hidden'}><span style="width:${(nd / p.rows.length) * 100}%"></span></div><p class="pc-done" data-done="${p.id}">${doneLabel(p)}</p>` : ''}
           ${p.rows.length ? `<button class="btn small" data-open="${p.id}" aria-expanded="${open}">${open ? 'Masquer la liste' : 'Voir la liste'}</button>` : '<p class="pc-c">Rien à signaler avec ces seuils.</p>'}
         </article>`;
         if (open) h += `<div class="plist">${listTable(p)}</div>`;
@@ -200,40 +214,74 @@
       if (state.open) document.querySelector('.plist')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }));
     box.querySelector('[data-more]')?.addEventListener('click', () => { state.shown += 200; renderReview(SF.computed()); });
+    box.querySelector('[data-hide]')?.addEventListener('change', e => { state.hideDone = e.target.checked; renderReview(SF.computed()); });
+  }
+
+  // Un seul écouteur pour tous les boutons de décision (la liste est redessinée souvent)
+  $('#tab-review').addEventListener('click', e => {
+    const b = e.target.closest('.dec button');
+    if (!b) return;
+    const wrap = b.parentElement, k = wrap.dataset.k, ch = b.dataset.d;
+    const cur = SF.dec.get(k);
+    const off = !!cur && cur.d === ch;
+    SF.dec.set(k, off ? null : ch);
+    wrap.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(!off && x === b)));
+    const tr = wrap.closest('tr');
+    tr.classList.toggle('done', !off);
+    tr.querySelector('.dmeta')?.remove();
+    const p = state.c && state.c.pistes.find(x => x.id === wrap.dataset.p);
+    if (p) {
+      const nd = doneCount(p);
+      const lab = document.querySelector(`[data-done="${p.id}"]`); if (lab) lab.textContent = doneLabel(p);
+      const prog = document.querySelector(`[data-prog="${p.id}"]`); if (prog) { prog.hidden = !nd; prog.firstElementChild.style.width = (nd / p.rows.length) * 100 + '%'; }
+      const top = document.querySelector('[data-donetop]'); if (top) top.textContent = doneLabel(p) || 'Aucune ligne décidée';
+    }
+    renderExport(state.c);
+  });
+
+  function decCell(p, r) {
+    const k = SF.decKey(p.id, r), cur = SF.dec.get(k);
+    const choices = SF.CHOICES[p.id];
+    const other = cur && !choices.includes(cur.d) ? `${esc(cur.d)} · ` : '';
+    return `<td class="dcell"><div class="dec" data-k="${esc(k)}" data-p="${p.id}" role="group" aria-label="Décision">${choices.map(ch => `<button type="button" data-d="${esc(ch)}" aria-pressed="${!!cur && cur.d === ch}">${esc(ch)}</button>`).join('')}</div>${cur ? `<small class="dmeta">${other}le ${esc(cur.date.split('-').reverse().join('/'))}${cur.com ? ' · ' + esc(cur.com) : ''}</small>` : ''}</td>`;
   }
 
   function listTable(p) {
-    const rows = p.rows.slice(0, state.shown);
+    const visible = state.hideDone ? p.rows.filter(r => !isDone(p, r)) : p.rows;
+    const rows = visible.slice(0, state.shown);
     const multi = fondsNames().length > 1 && state.fonds === ALL;
-    let h = '<div class="tscroll"><table class="tl-list"><thead><tr>';
+    let h = `<div class="ltools"><label><input type="checkbox" data-hide${state.hideDone ? ' checked' : ''}> Masquer les lignes déjà décidées</label><span class="muted" data-donetop>${doneLabel(p) || 'Aucune ligne décidée'}</span></div>`;
+    h += '<div class="tscroll"><table class="tl-list"><thead><tr>';
     if (p.kind === 'series') {
-      h += `<th>Cote</th><th>Série</th>${multi ? '<th>Fonds</th>' : ''}<th>À faire</th><th>Détail</th></tr></thead><tbody>`;
-      h += rows.map(r => `<tr class="${r.prio === 0 ? 'prio' : ''}"><td class="cote">${esc(r.serie.cote)}</td><td><strong>${esc(r.serie.nom)}</strong></td>${multi ? `<td>${esc(r.serie.fonds)}</td>` : ''}<td>${esc(r.motif)}</td><td class="muted">${esc(r.note)}</td></tr>`).join('');
+      h += `<th>Cote</th><th>Série</th>${multi ? '<th>Fonds</th>' : ''}<th>À faire</th><th>Détail</th><th>Décision</th></tr></thead><tbody>`;
+      h += rows.map(r => `<tr class="${r.prio === 0 ? 'prio' : ''}${isDone(p, r) ? ' done' : ''}"><td class="cote" data-l="Cote">${esc(r.serie.cote)}</td><td class="ttl"><strong>${esc(r.serie.nom)}</strong></td>${multi ? `<td data-l="Fonds">${esc(r.serie.fonds)}</td>` : ''}<td data-l="À faire">${esc(r.motif)}</td><td class="muted" data-l="Détail">${esc(r.note)}</td>${decCell(p, r)}</tr>`).join('');
     } else {
-      h += `<th>Cote</th><th>Titre</th>${multi ? '<th>Fonds</th>' : ''}<th>Motif</th><th class="num">Prêts an</th><th class="num">Total</th><th>Statut</th></tr></thead><tbody>`;
+      h += `<th>Cote</th><th>Titre</th>${multi ? '<th>Fonds</th>' : ''}<th>Motif</th><th class="num">Prêts an</th><th class="num">Total</th><th>Statut</th><th>Décision</th></tr></thead><tbody>`;
       h += rows.map(r => {
         const it = r.it;
-        return `<tr class="${r.prio === 0 || r.flag ? 'prio' : ''}"><td class="cote">${esc(it.cote)}</td>
-          <td><strong>${esc(it.titre)}</strong>${it.serie ? `<br><small>${esc(it.serie)}${it.tome != null ? ' · t. ' + it.tome : ''}</small>` : ''}${it.auteur ? `<br><small class="muted">${esc(it.auteur.split(/[,;]/)[0])}</small>` : ''}</td>
-          ${multi ? `<td>${esc(it.fonds)}</td>` : ''}
-          <td>${esc(r.motif)}${r.note ? `<br><small class="${r.prio === 0 || r.flag ? 'warn' : 'muted'}">${esc(r.note)}</small>` : ''}</td>
-          <td class="num">${it.pa ?? '–'}</td><td class="num">${it.pv ?? '–'}</td><td><small>${esc((it.statut || '').replace(/\s*\([A-Z]+\)$/, ''))}</small></td></tr>`;
+        return `<tr class="${r.prio === 0 || r.flag ? 'prio' : ''}${isDone(p, r) ? ' done' : ''}"><td class="cote" data-l="Cote">${esc(it.cote)}</td>
+          <td class="ttl"><strong>${esc(it.titre)}</strong>${it.serie ? `<br><small>${esc(it.serie)}${it.tome != null ? ' · t. ' + it.tome : ''}</small>` : ''}${it.auteur ? `<br><small class="muted">${esc(it.auteur.split(/[,;]/)[0])}</small>` : ''}</td>
+          ${multi ? `<td data-l="Fonds">${esc(it.fonds)}</td>` : ''}
+          <td data-l="Motif">${esc(r.motif)}${r.note ? `<br><small class="${r.prio === 0 || r.flag ? 'warn' : 'muted'}">${esc(r.note)}</small>` : ''}</td>
+          <td class="num" data-l="Prêts an">${it.pa ?? '–'}</td><td class="num" data-l="Total">${it.pv ?? '–'}</td><td data-l="Statut"><small>${esc((it.statut || '').replace(/\s*\([A-Z]+\)$/, ''))}</small></td>${decCell(p, r)}</tr>`;
       }).join('');
     }
     h += '</tbody></table></div>';
-    if (p.rows.length > rows.length) h += `<p class="more"><button class="btn ghost small" data-more>Afficher plus (${F.int(p.rows.length - rows.length)} restants)</button> <span class="muted">La liste complète est dans l'export Excel.</span></p>`;
+    if (visible.length > rows.length) h += `<p class="more"><button class="btn ghost small" data-more>Afficher plus (${F.int(visible.length - rows.length)} restants)</button> <span class="muted">La liste complète est dans l'export Excel.</span></p>`;
     return h;
   }
 
   // ---------- exports ----------
   function renderExport(c) {
     const nb = c.pistes.reduce((a, p) => a + p.rows.length, 0);
+    const nd = c.pistes.reduce((a, p) => a + doneCount(p), 0);
+    const total = SF.dec.count();
     $('#tab-export').innerHTML = `
       <p class="sub">Les exports reprennent le fonds sélectionné (<strong>${esc(c.label)}</strong>) et les seuils réglés dans « À examiner ».</p>
       <div class="exports">
         <article class="ex">
           <h3>Liste à examiner <span class="fmt">Excel</span></h3>
-          <p>Un onglet par piste (${F.int(nb)} lignes), triées par cote pour le passage en rayon, avec une colonne <em>Décision</em> à choix (garder, retirer, remplacer…) et une colonne commentaire. Prête à imprimer en paysage.</p>
+          <p>Un onglet par piste (${F.int(nb)} lignes), triées par cote pour le passage en rayon, avec une colonne <em>Décision</em> à choix et une colonne commentaire.${nd ? ` <strong>Vos ${F.int(nd)} ${F.plural(nd, 'décision')} y ${nd > 1 ? 'sont reprises' : 'est reprise'}.</strong>` : ''}</p>
           <button class="btn" id="exXlsx">Télécharger le classeur</button>
         </article>
         <article class="ex">
@@ -246,7 +294,20 @@
           <p>Copie un résumé chiffré et quelques titres « en sommeil » à coller dans l'assistant de votre choix. Rien n'est envoyé par l'outil : vous gardez la main sur ce que vous partagez.</p>
           <button class="btn ghost" id="exIA">Copier le résumé</button>
         </article>
+      </div>
+      <div class="card savebox">
+        <h3>Garder vos décisions</h3>
+        <p><strong>${F.int(total)} ${F.plural(total, 'décision')}</strong> ${total > 1 ? 'sont gardées' : 'est gardée'} dans ce navigateur, sur cet appareil seulement : c'est un filet de sécurité, pas une sauvegarde (vider le cache les efface).</p>
+        <ol>
+          <li><strong>Téléchargez le classeur Excel</strong> : il contient vos décisions et se partage avec l'équipe. On peut aussi les compléter directement dans Excel.</li>
+          <li><strong>Redéposez-le ici</strong> plus tard, seul ou avec une nouvelle extraction : les décisions reviennent, et les titres déjà examinés apparaissent comme tels au lieu de revenir comme neufs.</li>
+        </ol>
+        ${total ? '<button class="btn ghost small" id="decClear">Effacer les décisions de ce navigateur</button>' : ''}
       </div>`;
+    $('#decClear')?.addEventListener('click', () => {
+      if (!confirm('Effacer toutes les décisions gardées dans ce navigateur ? Celles déjà enregistrées dans un classeur Excel ne sont pas touchées.')) return;
+      SF.dec.clear(); render(); toast('Décisions effacées de ce navigateur.');
+    });
     $('#exXlsx').addEventListener('click', e => run(e.target, () => SF.exportXlsx(SF.computed())));
     $('#exPptx').addEventListener('click', e => run(e.target, () => SF.exportPptx(SF.computed())));
     $('#exIA').addEventListener('click', async () => {
