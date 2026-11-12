@@ -17,7 +17,7 @@ window.SF = window.SF || {};
     plural: (n, s, p) => (n > 1 ? (p || s + 's') : s)
   };
 
-  SF.DEFAULTS = { dormant: 24, usure: 100, demande: 12 };
+  SF.DEFAULTS = { dormant: 24, usure: 100, demande: 12, weak: 0.33 };
 
   SF.PERIODES = [
     { label: 'Avant 1990', test: y => y < 1990 },
@@ -133,7 +133,7 @@ window.SF = window.SF || {};
       const totDorm = all.reduce((a, s) => a + s.dorm, 0);
       const cd = calm.reduce((a, s) => a + s.dorm, 0), cn = calm.reduce((a, s) => a + s.n, 0);
       if (calm.length && totDorm >= 10 && cd / totDorm >= 0.25) {
-        out.push(`Le sommeil se concentre : ${calm.length > 1 ? 'les rayons' : 'le rayon'} ${calm.map(s => `« ${s.seg} »`).join(', ')} (${F.pct(cn / t.n)} du fonds) ${calm.length > 1 ? 'regroupent' : 'regroupe'} <strong>${F.int(cd)} des ${F.int(totDorm)}</strong> documents en sommeil : une question de rayon, à trancher en bloc.`);
+        out.push(`Le sommeil se concentre : ${calm.length > 1 ? 'les rayons' : 'le rayon'} ${calm.map(s => `« ${s.seg} »`).join(', ')} (${F.pct(cn / t.n)} du fonds) ${calm.length > 1 ? 'regroupent' : 'regroupe'} <strong>${F.int(cd)} des ${F.int(totDorm)}</strong> documents en sommeil  : une question de rayon, à trancher en bloc dans l’onglet <button type="button" class="linklike" data-goto="rayons">Rayons</button>.`);
       }
     }
     if (pistes) {
@@ -369,6 +369,21 @@ window.SF = window.SF || {};
     pistes.series = series;
     pistes.segs = segs;
     return pistes;
+  };
+
+  /** Documents d'un rayon qui sortent nettement moins que leurs voisins (moins de la moitié de la médiane du rayon) */
+  SF.weakOf = function (s, items, ref, k) {
+    if (s.med == null || s.med <= 0) return [];
+    // au moins 2 ans de recul, et pas « redevenu demandé » (2 prêts ou plus cette année)
+    return items.filter(it => it.segKey === s.key && it.crea && (ref - it.crea) / (365.25 * DAY) >= 2 && (it.pa || 0) < 2)
+      .map(it => ({ it, r: SF.rotVie(it, ref) }))
+      .filter(x => x.r != null && x.r < k * s.med)
+      .sort((a, b) => a.r - b.r || (a.it.cote || '').localeCompare(b.it.cote || '', 'fr', { numeric: true }))
+      .map(x => ({
+        it: x.it, prio: 1, tri: x.r,
+        motif: `${F.dec(x.r)} prêt par an depuis ${x.it.crea.getFullYear()}, soit ${F.pct(x.r / s.med)} de la médiane du rayon`,
+        note: x.it.dernier ? `Dernier prêt : ${F.mois(x.it.dernier)} · ${x.it.pa ?? 0} cette année` : 'Aucun prêt connu'
+      }));
   };
 
   /** Prêts par an depuis l'entrée de l'exemplaire (au moins 2 ans de recul) */

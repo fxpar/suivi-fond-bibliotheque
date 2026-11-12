@@ -402,3 +402,42 @@ ul.why li { margin: 1px 0; }
   .tl-list.segs tr.st-set { background: var(--accent-soft); }
   .tl-list.segs tr.calme { box-shadow: inset 4px 0 0 var(--gold); }
 }
+
+/* ---------- onglet Rayons ---------- */
+.rayons-intro { margin-top: 0; border-left: 4px solid var(--gold); }
+.rayons-intro p { margin: 8px 0 0; color: var(--ink-2); font-size: .93rem; }
+.segcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin-top: 16px; }
+.segcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow); border-top: 4px solid var(--line); }
+.segcard.calme { border-top-color: var(--gold); }
+.segcard.kept { border-top-color: var(--renforcer); }
+.segcard.bloc { border-top-color: var(--remplacer); }
+.segcard.open { outline: 2px solid var(--accent); outline-offset: -1px; }
+.segcard header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.segcard h3 { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.badge { font-size: .74rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+.badge.warn-b { background: var(--warn-bg); color: var(--warn-ink); }
+.segnums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.segnums div { display: flex; flex-direction: column; background: var(--surface-2); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.segnums b { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.segnums span { font-size: .74rem; color: var(--muted); line-height: 1.25; }
+.segchoice { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.segchoice legend { font-weight: 700; font-size: .85rem; margin-bottom: 6px; padding: 0; }
+.segchoice label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.segchoice label:hover { border-color: var(--accent); }
+.segchoice label.on { border-color: var(--accent); background: var(--accent-soft); }
+.segchoice input { margin-top: 3px; accent-color: var(--accent); }
+.segchoice span { display: flex; flex-direction: column; gap: 2px; font-size: .9rem; }
+.segchoice small { color: var(--ink-2); font-size: .8rem; line-height: 1.35; }
+.segcard .btn { align-self: flex-start; }
+.segcards > .plist { grid-column: 1 / -1; }
+.linklike { background: none; border: 0; padding: 0; color: var(--accent-strong); text-decoration: underline; cursor: pointer; font: inherit; }
+@media (max-width: 720px) {
+  .segcards { grid-template-columns: 1fr; }
+  .segnums { grid-template-columns: 1fr 1fr; }
+}
+
+.settings.inset { margin-top: 12px; background: var(--surface-2); border: 0; }
+
+.tab .sm { display: none; }
+@media (max-width: 720px) { .tab .lg { display: none; } .tab .sm { display: inline; } .tab { padding: 10px 8px; font-size: .92rem; } .tabs { gap: 0; } }

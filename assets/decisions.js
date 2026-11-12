@@ -7,6 +7,7 @@ window.SF = window.SF || {};
   // Nom des feuilles de l'export Excel (sert aussi à reconnaître un classeur annoté)
   SF.SHEETS = {
     prio: 'Priorités',
+    faibles: 'Sortent moins (rayon)',
     dormants: 'Retirer - sans prêt',
     doublons: 'Retirer - doublons',
     usure: 'Remplacer - usure',
@@ -19,6 +20,7 @@ window.SF = window.SF || {};
   // Choix proposés selon la liste (le premier est « on ne touche à rien »)
   SF.CHOICES = {
     prio: ['Garder', 'Mettre en avant', 'Transférer', 'Retirer'],
+    faibles: ['Garder', 'Mettre en avant', 'Transférer', 'Retirer'],
     dormants: ['Garder', 'Mettre en avant', 'Transférer', 'Retirer'],
     doublons: ['Garder', 'Retirer'],
     usure: ['État correct', 'Réparer', 'Remplacer', 'Retirer'],
@@ -103,8 +105,9 @@ window.SF = window.SF || {};
     const byName = Object.fromEntries(Object.entries(SF.SHEETS).map(([k, v]) => [v, k]));
     for (const name of wb.SheetNames) {
       if (name === SF.RULES_SHEET) { entries.push(...readRules(wb.Sheets[name])); continue; }
-      const pid = byName[name];
-      if (!pid) continue;
+      const pid0 = byName[name];
+      if (!pid0) continue;
+      const pid = pid0 === 'faibles' ? 'prio' : pid0; // mêmes décisions que la liste ciblée
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
       if (rows.length < 2) continue;
       const h = rows[0].map(SF.norm);

@@ -56,7 +56,20 @@ window.SF = window.SF || {};
     line([]);
     const hr = line(['Onglet', 'Lignes', 'Ce qu\'il contient'], { bold: true });
     hr.eachCell(cl => { cl.fill = fill(C.blueL); });
-    for (const p of c.pistes) line([SHEETS[p.id], p.rows.length, `${p.why} ${p.caution}`]);
+    // listes exportées : les pistes + « sortent moins que leur rayon » (décisions partagées avec la liste ciblée)
+    const lists = [...c.pistes];
+    if (c.pistes.segs) {
+      const k = c.pistes.opts.weak || 0.33;
+      const rows = [];
+      for (const s of c.pistes.segs.values()) {
+        if (s.n < 5 || s.status === 'À conserver') continue;
+        SF.weakOf(s, c.items, c.ctx.ref, k).forEach(r => rows.push(Object.assign(r, { note: `Rayon ${s.seg} · ${r.note}` })));
+      }
+      lists.splice(1, 0, { id: 'faibles', decId: 'prio', kind: 'item', rows,
+        why: `Documents qui font moins de ${k === 0.5 ? 'la moitié' : k === 0.25 ? 'du quart' : 'du tiers'} des prêts annuels médians de leur rayon, depuis leur entrée (2 ans au moins), et empruntés moins de 2 fois cette année.`,
+        caution: 'Comparaison rayon par rayon (rayons « à conserver » exclus) : difficile à refaire à partir de la liste globale.' });
+    }
+    for (const p of lists) line([SHEETS[p.id], p.rows.length, `${p.why} ${p.caution}`]);
     line(['Synthèse', '', 'Indicateurs par fonds.']);
     if (c.ctx.histTronque) { line([]); line([`Attention : les dates de dernier emprunt commencent en ${F.mois(c.ctx.histStart)} (historique probablement remis à zéro).`]); }
     info.getColumn(3).alignment = { wrapText: true, vertical: 'top' };
@@ -103,7 +116,7 @@ window.SF = window.SF || {};
     line([SF.RULES_SHEET, '', 'Rayons (déduits de la cote) et protections : « À conserver » les retire des propositions, « À repenser en bloc » les sort de la liste ciblée. Modifiable ici, réimportable.']);
 
     // --- Listes ---
-    for (const p of c.pistes) {
+    for (const p of lists) {
       if (!p.rows.length) continue;
       const ws = wb.addWorksheet(SHEETS[p.id], {
         views: [{ state: 'frozen', ySplit: 1 }],
@@ -292,7 +305,7 @@ window.SF = window.SF || {};
   };
 
   const decOf = (p, r) => {
-    const d = SF.dec.get(SF.decKey(p.id, r));
+    const d = SF.dec.get(SF.decKey(p.decId || p.id, r));
     if (!d) return {};
     const [y, m, j] = d.date.split('-').map(Number);
     return { dec: d.d || null, com: d.com || null, dated: new Date(Date.UTC(y, m - 1, j)) };

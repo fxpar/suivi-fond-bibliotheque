@@ -89,12 +89,14 @@
     </div>
 
     <nav class="tabs" role="tablist">
-      <button role="tab" class="tab" aria-selected="true" data-tab="overview">Vue d'ensemble</button>
+      <button role="tab" class="tab" aria-selected="true" data-tab="overview"><span class="lg">Vue d'ensemble</span><span class="sm">Ensemble</span></button>
+      <button role="tab" class="tab" aria-selected="false" data-tab="rayons">Rayons</button>
       <button role="tab" class="tab" aria-selected="false" data-tab="review">À examiner <span class="count" id="reviewCount"></span></button>
       <button role="tab" class="tab" aria-selected="false" data-tab="export">Exporter</button>
     </nav>
 
     <div class="panel" id="tab-overview"></div>
+    <div class="panel" id="tab-rayons" hidden></div>
     <div class="panel" id="tab-review" hidden></div>
     <div class="panel" id="tab-export" hidden></div>
   </section>

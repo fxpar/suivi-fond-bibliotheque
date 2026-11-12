@@ -161,11 +161,17 @@
   /** Périmètre des exports : le fonds affiché, ou tous les fonds (choix de l'onglet Exporter) */
   const exportData = () => (state.exportAll && state.fonds !== ALL ? SF.computedAll() : SF.computed());
 
-  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
-    state.tab = b.dataset.tab;
-    document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === b));
-    document.querySelectorAll('.panel').forEach(p => { p.hidden = p.id !== 'tab-' + state.tab; });
-  }));
+  function showTab(name) {
+    state.tab = name;
+    document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', String(x.dataset.tab === name)));
+    document.querySelectorAll('.panel').forEach(p => { p.hidden = p.id !== 'tab-' + name; });
+  }
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  // liens internes « aller à l'onglet … »
+  document.addEventListener('click', e => {
+    const g = e.target.closest('[data-goto]');
+    if (g) { showTab(g.dataset.goto); window.scrollTo({ top: $('.tabs').offsetTop - 10, behavior: 'smooth' }); }
+  });
 
   function render() {
     state.allP = null; state.rulesCache = null;
@@ -173,6 +179,7 @@
     renderContext();
     renderChips();
     renderOverview(c);
+    renderRayons(c);
     renderReview(c);
     renderExport(exportData());
     $('#reviewCount').textContent = F.int(c.pistes.find(p => p.id === 'prio').rows.length);
@@ -307,7 +314,7 @@
           ${p.rows.length ? `<div class="prog" data-prog="${p.id}"${nd ? '' : ' hidden'}><span style="width:${(nd / p.rows.length) * 100}%"></span></div><p class="pc-done" data-done="${p.id}">${doneLabel(p)}</p>` : ''}
           ${p.rows.length ? `<button class="btn small" data-open="${p.id}" aria-expanded="${open}">${open ? 'Masquer la liste' : 'Voir la liste'}</button>` : '<p class="pc-c">Rien à signaler avec ces seuils.</p>'}
         </article>`;
-        if (open) h += `<div class="plist">${listTable(p)}</div>`;
+        if (open) h += `<div class="plist" data-plist="${p.id}">${listTable(p)}</div>`;
       }
       h += '</div>';
     }
@@ -320,15 +327,111 @@
     }));
     box.querySelectorAll('[data-more]').forEach(b => b.addEventListener('click', () => { state.shown += 200; renderReview(SF.computed()); }));
     box.querySelectorAll('[data-hide]').forEach(b => b.addEventListener('change', e => { state.hideDone = e.target.checked; renderReview(SF.computed()); }));
-    // statut d'un rayon
-    box.querySelectorAll('select[data-seg]').forEach(s => s.addEventListener('change', () => {
-      const i = s.dataset.seg.indexOf('|');
-      SF.dec.set(SF.segDecKey(s.dataset.seg.slice(0, i), s.dataset.seg.slice(i + 1)), s.value || null);
+  }
+
+  // ---------- liste ciblée (onglet « À examiner ») ----------
+  function renderPriorites(c) {
+    const p = c.pistes.find(x => x.id === 'prio');
+    const all = [...c.pistes.segs.values()];
+    const multi = new Set(all.map(s => s.fonds)).size > 1;
+    const ex = p.excl;
+    const blocs = all.filter(s => s.status === 'À repenser en bloc');
+    const kept = all.filter(s => s.status === 'À conserver');
+    const exParts = [ex.rayon && `${F.int(ex.rayon)} dans des rayons à conserver`, ex.regle && `${F.int(ex.regle)} par vos règles de protection`, ex.garde && `${F.int(ex.garde)} déjà « gardés »`, ex.bloc && `${F.int(ex.bloc)} dans des rayons à repenser en bloc`].filter(Boolean);
+    const politique = kept.length || blocs.length
+      ? `Politique des rayons appliquée : ${[kept.length && `${kept.length} à conserver`, blocs.length && `${blocs.length} à repenser en bloc`].filter(Boolean).join(', ')}.`
+      : 'Aucune politique de rayon n’est encore définie : tous les rayons sont examinés exemplaire par exemplaire.';
+    return `<h2 class="gh">Liste ciblée</h2>
+      <div class="card prio-card">
+        <h3>${F.int(p.rows.length)} ${F.plural(p.rows.length, 'exemplaire')} à examiner en priorité</h3>
+        <p class="sub">Ils cumulent plusieurs signaux, et chacun est comparé à <strong>son propre rayon</strong> : un document qui dort dans un rayon qui dort n'y figure que s'il est nettement plus faible que ses voisins.</p>
+        <p class="pc-c">${politique} <button type="button" class="linklike" data-goto="rayons">Régler la politique des rayons</button></p>
+        <details class="howto"><summary>Comment la liste est construite</summary>
+          <p>Signaux : en sommeil (3 points) · moins de la moitié des prêts par an médians de son rayon depuis son entrée (2) · usé et délaissé, au moins 60 prêts mais 0 ou 1 cette année (2) · doublon peu demandé (2) · présent dans un autre fonds (1) · série entièrement endormie (1). Retenu à partir de 5 points.</p>
+          <p>Écartés d'office : en prêt ou réservés, entrés depuis moins de 2 ans, empruntés au moins 2 fois cette année, tomes d'une série encore active${ex.serie ? ` (${F.int(ex.serie)} ici)` : ''}.</p>
+        </details>
+        ${exParts.length ? `<p class="pc-c">Écartés selon vos choix : ${exParts.join(', ')}.</p>` : ''}
+        ${blocs.length ? `<ul class="blocs">${blocs.map(s => `<li><strong>Rayon « ${esc(s.seg)} »</strong>${multi ? ` (${esc(s.fonds)})` : ''} : ${F.int(s.n)} documents dont ${F.int(s.dorm)} en sommeil, à décider en bloc.</li>`).join('')}</ul>` : ''}
+        ${p.rows.length ? `<div class="plist" data-plist="prio">${listTable(p)}</div>` : '<p class="pc-c">Aucun exemplaire ne cumule assez de signaux avec ces réglages.</p>'}
+      </div>`;
+  }
+
+  // ---------- onglet « Rayons » ----------
+  const SEG_CHOICES = [
+    ['', 'Exemplaire par exemplaire', 'Par défaut. Chaque document est comparé à ses voisins de rayon : les plus faibles peuvent entrer dans la liste ciblée et dans les listes « Retirer ? ».'],
+    ['À conserver', 'À conserver', 'Le rayon a une mission (patrimoine, BD muettes, fonds de référence…) : ses documents ne sont plus proposés au retrait, quelle que soit leur circulation.'],
+    ['À repenser en bloc', 'À repenser en bloc', 'La question se pose pour tout le rayon : le déplacer, le mettre en valeur, le réduire. Ses documents sortent de la liste ciblée ; ils restent visibles dans les listes par critère.']
+  ];
+
+  const weakOf = (s, items, ref, k) => SF.weakOf(s, items, ref, k);
+
+  function renderRayons(c) {
+    const all = [...c.pistes.segs.values()];
+    const segs = all.filter(s => s.n >= 5).sort((a, b) => a.fonds.localeCompare(b.fonds, 'fr') || (b.calme ? 1 : 0) - (a.calme ? 1 : 0) || b.n - a.n);
+    const small = all.filter(s => s.n < 5);
+    const multi = new Set(segs.map(s => s.fonds)).size > 1;
+    const dm = c.pistes.opts.dormant;
+    const rules = SF.rules();
+    state.segWeak = {};
+    const card = s => {
+      const weak = weakOf(s, c.items, c.ctx.ref, state.opts.weak);
+      state.segWeak[s.key] = { id: 'prio', kind: 'segweak', rows: weak };
+      const open = state.segOpen === s.key;
+      const name = `seg-${btoa(unescape(encodeURIComponent(s.key))).replace(/[^a-z0-9]/gi, '')}`;
+      return `<article class="segcard${s.calme ? ' calme' : ''}${s.status === 'À conserver' ? ' kept' : s.status ? ' bloc' : ''}${open ? ' open' : ''}">
+          <header><h3>${esc(s.seg)}</h3>${multi ? `<span class="muted">${esc(s.fonds)}</span>` : ''}
+            <span class="badges">${s.calme ? '<span class="badge warn-b">nettement plus calme que le fonds</span>' : ''}${s.small ? '<span class="badge">petit effectif</span>' : ''}</span></header>
+          <div class="segnums">
+            <div><b>${F.int(s.n)}</b><span>documents</span></div>
+            <div><b>${F.int(s.dorm)}</b><span>en sommeil (${F.pct(s.part)})</span></div>
+            <div><b>${F.dec(s.rot)}</b><span>prêts par doc. cette année</span></div>
+            <div><b>${s.med != null ? F.dec(s.med) : '–'}</b><span>prêts par an depuis l'entrée (médiane)</span></div>
+          </div>
+          <fieldset class="segchoice"><legend>Politique pour ce rayon</legend>
+            ${SEG_CHOICES.map(([v, l, d]) => `<label class="${(s.status || '') === v ? 'on' : ''}"><input type="radio" name="${name}" value="${esc(v)}" data-segk="${esc(s.fonds)}|${esc(s.seg)}"${(s.status || '') === v ? ' checked' : ''}><span><strong>${l}</strong><small>${d}</small></span></label>`).join('')}
+          </fieldset>
+          ${weak.length ? `<button class="btn small${open ? '' : ' ghost'}" type="button" data-segopen="${esc(s.key)}" aria-expanded="${open}">${open ? 'Masquer' : 'Voir'} les ${F.int(weak.length)} documents qui sortent moins que ce rayon</button>`
+            : '<p class="pc-c">Aucun document ne sort nettement moins que les autres dans ce rayon.</p>'}
+        </article>${open ? `<div class="plist" data-plist="seg">${listTable(state.segWeak[s.key], { noFonds: true })}</div>` : ''}`;
+    };
+    $('#tab-rayons').innerHTML = `
+      <div class="card rayons-intro">
+        <h3>Décider rayon par rayon</h3>
+        <p>Un <strong>rayon</strong> regroupe les documents dont la cote est identique au code auteur près (« B.D. ARL DOC » et « B.D. GOS DOC » forment le rayon « B.D. … DOC »). Un rayon entier peu emprunté n'appelle pas le même traitement qu'un exemplaire isolé : on fixe d'abord la <strong>politique du rayon</strong>, puis on regarde, à l'intérieur, les documents qui sortent <strong>nettement moins que leurs voisins</strong>, en prêts par an depuis leur entrée (seuil réglable ci-dessous). Les documents empruntés au moins 2 fois cette année sont écartés : ils ont retrouvé leur public.</p>
+        <p class="pc-c">« En sommeil » : sans prêt depuis ${dm} mois. Les effectifs comptent autant que les pourcentages : sur un petit rayon, quelques documents suffisent à faire varier la part.</p>
+        <div class="settings inset"><label>Un document « sort moins que son rayon » s'il fait moins de
+          <select id="weakSel">${[[0.5, 'la moitié'], [0.33, 'le tiers'], [0.25, 'le quart']].map(([v, l]) => `<option value="${v}"${v === state.opts.weak ? ' selected' : ''}>${l}</option>`).join('')}</select>
+          des prêts annuels médians du rayon</label></div>
+        <p class="pc-c">Dans un rayon très emprunté, préférez « le quart » : la moitié de 4 prêts par an reste une circulation honorable.</p>
+      </div>
+      <div class="segcards">${segs.map(card).join('')}</div>
+      ${small.length ? `<p class="pc-c">${F.int(small.length)} ${F.plural(small.length, 'petit rayon')} de moins de 5 documents ${small.length > 1 ? 'ne sont pas affichés' : 'n’est pas affiché'}.</p>` : ''}
+      <div class="card">
+        <h3>Protéger ce que la cote ne dit pas</h3>
+        <p class="sub">BD muettes, fonds local, série de référence… Les documents dont la cote, ou le titre et la série, contiennent ce texte ne sont plus proposés au retrait.</p>
+        <form class="rules" id="ruleForm">
+          <select id="ruleType" aria-label="Type de règle">${Object.entries(SF.RULE_TYPES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+          <input id="ruleVal" type="text" placeholder="ex. MUET, fonds local, Tintin…" aria-label="Texte recherché">
+          <button class="btn small" type="submit">Protéger</button>
+          ${rules.length ? `<span class="chips-r">${rules.map(r => `<span class="rchip">${esc(SF.RULE_TYPES[r.type] || r.type)} « ${esc(r.value)} » <button type="button" data-unrule="${esc(r.key)}" aria-label="Retirer cette protection">✕</button></span>`).join('')}</span>` : ''}
+        </form>
+      </div>`;
+    const box = $('#tab-rayons');
+    $('#weakSel').addEventListener('change', e => { state.opts.weak = +e.target.value; state.shown = 100; renderRayons(state.c); });
+    box.querySelectorAll('input[data-segk]').forEach(r => r.addEventListener('change', () => {
+      const i = r.dataset.segk.indexOf('|'), seg = r.dataset.segk.slice(i + 1);
+      SF.dec.set(SF.segDecKey(r.dataset.segk.slice(0, i), seg), r.value || null);
       render();
-      toast(s.value ? `Rayon « ${s.dataset.seg.slice(i + 1)} » : ${s.value.toLowerCase()}.` : 'Rayon examiné de nouveau exemplaire par exemplaire.');
+      toast(r.value ? `Rayon « ${seg} » : ${r.value.toLowerCase()}.` : `Rayon « ${seg} » : examiné exemplaire par exemplaire.`);
     }));
-    // règles de protection
-    box.querySelector('#ruleForm')?.addEventListener('submit', e => {
+    box.querySelectorAll('[data-segopen]').forEach(b => b.addEventListener('click', () => {
+      state.segOpen = state.segOpen === b.dataset.segopen ? null : b.dataset.segopen; state.shown = 100;
+      renderRayons(state.c);
+      if (state.segOpen) box.querySelector('.plist')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }));
+    box.querySelectorAll('[data-more]').forEach(b => b.addEventListener('click', () => { state.shown += 200; renderRayons(state.c); }));
+    box.querySelectorAll('[data-hide]').forEach(b => b.addEventListener('change', e => { state.hideDone = e.target.checked; renderRayons(state.c); }));
+    box.querySelector('#ruleForm').addEventListener('submit', e => {
       e.preventDefault();
       const v = $('#ruleVal').value.trim(), type = $('#ruleType').value;
       if (SF.norm(v).length < 2) { toast('Indiquez au moins deux caractères.'); return; }
@@ -340,53 +443,6 @@
     box.querySelectorAll('[data-unrule]').forEach(b => b.addEventListener('click', () => {
       SF.dec.setCom(b.dataset.unrule, ''); SF.dec.set(b.dataset.unrule, null); render();
     }));
-  }
-
-  // ---------- priorités : rayons puis liste ciblée ----------
-  function renderPriorites(c) {
-    const p = c.pistes.find(x => x.id === 'prio');
-    const all = [...c.pistes.segs.values()];
-    const segs = all.filter(s => s.n >= 5).sort((a, b) => a.fonds.localeCompare(b.fonds, 'fr') || (b.calme ? 1 : 0) - (a.calme ? 1 : 0) || b.n - a.n);
-    const multi = new Set(segs.map(s => s.fonds)).size > 1;
-    const dm = c.pistes.opts.dormant;
-    const opt = (s, v, l) => `<option value="${v}"${(s.status || '') === v ? ' selected' : ''}>${l}</option>`;
-    const segRow = s => `<tr class="${s.calme ? 'calme' : ''}${s.status ? ' st-set' : ''}">
-        <td data-l="Rayon"><strong>${esc(s.seg)}</strong>${multi ? `<br><small class="muted">${esc(s.fonds)}</small>` : ''}</td>
-        <td class="num" data-l="Documents">${F.int(s.n)}</td>
-        <td class="num" data-l="En sommeil">${F.int(s.dorm)} <small class="muted">(${F.pct(s.part)})</small>${s.calme ? '<br><small class="warn">nettement plus calme</small>' : ''}${s.small ? '<br><small class="muted">petit effectif</small>' : ''}</td>
-        <td class="num" data-l="Prêts/doc./an">${F.dec(s.rot)}</td>
-        <td data-l="Décision"><select data-seg="${esc(s.fonds)}|${esc(s.seg)}" aria-label="Décision pour le rayon ${esc(s.seg)}">${opt(s, '', 'Exemplaire par exemplaire')}${SF.SEG_STATUS.map(v => opt(s, v, v)).join('')}</select></td></tr>`;
-    const rules = SF.rules();
-    const ex = p.excl;
-    const blocs = all.filter(s => s.status === 'À repenser en bloc');
-    const kept = all.filter(s => s.status === 'À conserver');
-    const exParts = [ex.rayon && `${F.int(ex.rayon)} dans des rayons à conserver`, ex.regle && `${F.int(ex.regle)} par vos règles`, ex.garde && `${F.int(ex.garde)} déjà « gardés »`, ex.bloc && `${F.int(ex.bloc)} dans des rayons à repenser en bloc`].filter(Boolean);
-    return `<h2 class="gh">Priorités</h2>
-      <div class="card prio-card">
-        <h3>1. Les rayons</h3>
-        <p class="sub">Un rayon entier peu emprunté se décide <strong>en bloc</strong>, pas exemplaire par exemplaire : à conserver pour sa mission (BD muettes, patrimoine, documentaires…) ou à repenser (déplacer, mettre en valeur, réduire). Les rayons sont déduits de la cote, sans le code auteur. « En sommeil » : sans prêt depuis ${dm} mois.</p>
-        <div class="tscroll"><table class="tl-list segs"><thead><tr><th>Rayon</th><th class="num">Documents</th><th class="num">En sommeil</th><th class="num">Prêts/doc./an</th><th>Décision</th></tr></thead>
-        <tbody>${segs.map(segRow).join('')}</tbody></table></div>
-        <form class="rules" id="ruleForm">
-          <span class="rules-t">Protéger aussi :</span>
-          <select id="ruleType" aria-label="Type de règle">${Object.entries(SF.RULE_TYPES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
-          <input id="ruleVal" type="text" placeholder="ex. MUET, fonds local, Tintin…" aria-label="Texte recherché">
-          <button class="btn small" type="submit">Protéger</button>
-          ${rules.length ? `<span class="chips-r">${rules.map(r => `<span class="rchip">${esc(SF.RULE_TYPES[r.type] || r.type)} « ${esc(r.value)} » <button type="button" data-unrule="${esc(r.key)}" aria-label="Retirer cette protection">✕</button></span>`).join('')}</span>` : ''}
-        </form>
-        <p class="pc-c">Les exemplaires protégés (rayon « à conserver », règle, ou « Garder » déjà décidé) ne sont plus proposés au retrait, ni ici ni dans les listes « Retirer ? ».${kept.length ? ` Rayons à conserver : ${kept.map(s => `« ${esc(s.seg)} »`).join(', ')}.` : ''}</p>
-      </div>
-      <div class="card prio-card">
-        <h3>2. Liste ciblée : ${F.int(p.rows.length)} ${F.plural(p.rows.length, 'exemplaire')}</h3>
-        <p class="sub">Ils cumulent plusieurs signaux, et chacun est comparé à <strong>son propre rayon</strong> : un document qui dort dans un rayon qui dort n'y figure que s'il est nettement plus faible que ses voisins.</p>
-        <details class="howto"><summary>Comment la liste est construite</summary>
-          <p>Signaux : en sommeil (3 points) · moins de la moitié des prêts par an médians de son rayon depuis son entrée (2) · usé et délaissé, au moins 60 prêts mais 0 ou 1 cette année (2) · doublon peu demandé (2) · présent dans un autre fonds (1) · série entièrement endormie (1). Retenu à partir de 5 points.</p>
-          <p>Écartés d'office : en prêt ou réservés, entrés depuis moins de 2 ans, empruntés au moins 2 fois cette année, tomes d'une série encore active${ex.serie ? ` (${F.int(ex.serie)} ici)` : ''}.</p>
-        </details>
-        ${exParts.length ? `<p class="pc-c">Écartés par vos protections : ${exParts.join(', ')}.</p>` : ''}
-        ${blocs.length ? `<ul class="blocs">${blocs.map(s => `<li><strong>Rayon « ${esc(s.seg)} »</strong>${multi ? ` (${esc(s.fonds)})` : ''} : ${F.int(s.n)} documents dont ${F.int(s.dorm)} en sommeil, à décider en bloc.</li>`).join('')}</ul>` : ''}
-        ${p.rows.length ? `<div class="plist">${listTable(p)}</div>` : '<p class="pc-c">Aucun exemplaire ne cumule assez de signaux avec ces réglages.</p>'}
-      </div>`;
   }
 
   // Un seul écouteur pour tous les boutons de décision (la liste est redessinée souvent)
@@ -407,8 +463,11 @@
       const nd = doneCount(p);
       const lab = document.querySelector(`[data-done="${p.id}"]`); if (lab) lab.textContent = doneLabel(p);
       const prog = document.querySelector(`[data-prog="${p.id}"]`); if (prog) { prog.hidden = !nd; prog.firstElementChild.style.width = (nd / p.rows.length) * 100 + '%'; }
-      const top = document.querySelector('[data-donetop]'); if (top) top.textContent = doneLabel(p) || 'Aucune ligne décidée';
     }
+    const holder = wrap.closest('[data-plist]');
+    const lp = holder && holder.dataset.plist === 'seg' ? state.segWeak && state.segWeak[state.segOpen] : p;
+    const top = holder && holder.querySelector('[data-donetop]');
+    if (top && lp) top.textContent = doneLabel(lp) || 'Aucune ligne décidée';
     renderExport(exportData());
   });
 
@@ -424,10 +483,10 @@
     return `<div class="dec" data-k="${esc(k)}" data-p="${pid}" role="group" aria-label="Décision">${choices.map(ch => `<button type="button" data-d="${esc(ch)}" aria-pressed="${!!cur && cur.d === ch}">${esc(ch)}</button>`).join('')}</div>${meta}`;
   }
 
-  function listTable(p) {
+  function listTable(p, o = {}) {
     const visible = state.hideDone ? p.rows.filter(r => !isDone(p, r)) : p.rows;
     const rows = visible.slice(0, state.shown);
-    const multi = fondsNames().length > 1 && state.fonds === ALL;
+    const multi = !o.noFonds && fondsNames().length > 1 && state.fonds === ALL;
     let h = `<div class="ltools"><label><input type="checkbox" data-hide${state.hideDone ? ' checked' : ''}> Masquer les lignes déjà décidées</label><span class="muted" data-donetop>${doneLabel(p) || 'Aucune ligne décidée'}</span></div>`;
     h += '<div class="tscroll"><table class="tl-list"><thead><tr>';
     if (p.kind === 'series') {
