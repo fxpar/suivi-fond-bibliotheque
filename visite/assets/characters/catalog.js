@@ -1,4 +1,5 @@
 /* Répertoire des personnages — généré par tools/generate-avatars.js, éditable à la main.
+ * Visite guidée : descriptions adaptées aux métiers des bibliothèques.
  * Chaque personnage : id, name, description, tags (filtres de l'écran d'accueil), images par expression.
  * Expressions utilisées par les formats : neutral, happy, encouraging, thinking, surprised, concerned (repli sur "neutral"). */
 window.MLS_CHARACTERS = {
@@ -15,8 +16,8 @@ window.MLS_CHARACTERS = {
       "id": "amina",
       "name": "Amina",
       "description": {
-        "fr": "Ingénieure, porte un hijab.",
-        "en": "Engineer, wears a hijab."
+        "fr": "Bibliothécaire, responsable du fonds BD, porte un hijab.",
+        "en": "Librarian in charge of the comics collection, wears a hijab."
       },
       "tags": [
         "femme",
@@ -35,8 +36,8 @@ window.MLS_CHARACTERS = {
       "id": "lucas",
       "name": "Lucas",
       "description": {
-        "fr": "Chef de projet, porte des lunettes.",
-        "en": "Project manager, wears glasses."
+        "fr": "Responsable de la politique documentaire, porte des lunettes.",
+        "en": "Head of collection development, wears glasses."
       },
       "tags": [
         "homme",
@@ -55,8 +56,8 @@ window.MLS_CHARACTERS = {
       "id": "mei",
       "name": "Mei",
       "description": {
-        "fr": "Étudiante en design.",
-        "en": "Design student."
+        "fr": "Étudiante en sciences de l’information, en stage à la médiathèque.",
+        "en": "Information science student, intern at the library."
       },
       "tags": [
         "femme",
@@ -75,8 +76,8 @@ window.MLS_CHARACTERS = {
       "id": "jose",
       "name": "José",
       "description": {
-        "fr": "Formateur expérimenté, porte un appareil auditif.",
-        "en": "Experienced trainer, wears a hearing aid."
+        "fr": "Bibliothécaire expérimenté, formateur du réseau, porte un appareil auditif.",
+        "en": "Experienced librarian and network trainer, wears a hearing aid."
       },
       "tags": [
         "homme",
@@ -96,8 +97,8 @@ window.MLS_CHARACTERS = {
       "id": "fatou",
       "name": "Fatou",
       "description": {
-        "fr": "Développeuse, se déplace en fauteuil roulant.",
-        "en": "Developer, uses a wheelchair."
+        "fr": "Responsable du catalogue et du SIGB, se déplace en fauteuil roulant.",
+        "en": "In charge of the catalogue and library system, uses a wheelchair."
       },
       "tags": [
         "femme",
@@ -117,8 +118,8 @@ window.MLS_CHARACTERS = {
       "id": "tom",
       "name": "Tom",
       "description": {
-        "fr": "Alternant, curieux de tout.",
-        "en": "Apprentice, curious about everything."
+        "fr": "Alternant en médiathèque, curieux de tout.",
+        "en": "Library apprentice, curious about everything."
       },
       "tags": [
         "homme",
@@ -137,8 +138,8 @@ window.MLS_CHARACTERS = {
       "id": "ines",
       "name": "Inès",
       "description": {
-        "fr": "Directrice, bientôt à la retraite.",
-        "en": "Director, about to retire."
+        "fr": "Directrice de la médiathèque, bientôt à la retraite.",
+        "en": "Library director, about to retire."
       },
       "tags": [
         "femme",
@@ -157,8 +158,8 @@ window.MLS_CHARACTERS = {
       "id": "karan",
       "name": "Karan",
       "description": {
-        "fr": "Responsable qualité, porte un turban.",
-        "en": "Quality manager, wears a turban."
+        "fr": "Responsable de l’accueil et du prêt, porte un turban.",
+        "en": "Head of front desk and lending, wears a turban."
       },
       "tags": [
         "homme",
@@ -177,8 +178,8 @@ window.MLS_CHARACTERS = {
       "id": "sam",
       "name": "Sam",
       "description": {
-        "fr": "UX designer, non-binaire.",
-        "en": "UX designer, non-binary."
+        "fr": "Chargé·e de médiation numérique, non-binaire.",
+        "en": "Digital outreach officer, non-binary."
       },
       "tags": [
         "non-binaire",
@@ -197,8 +198,8 @@ window.MLS_CHARACTERS = {
       "id": "noah",
       "name": "Noah",
       "description": {
-        "fr": "Expert accessibilité, non-voyant, utilise une canne blanche.",
-        "en": "Accessibility expert, blind, uses a white cane."
+        "fr": "Bibliothécaire référent accessibilité, non-voyant, utilise une canne blanche.",
+        "en": "Accessibility lead librarian, blind, uses a white cane."
       },
       "tags": [
         "homme",
@@ -218,8 +219,8 @@ window.MLS_CHARACTERS = {
       "id": "lea",
       "name": "Léa",
       "description": {
-        "fr": "Juriste, porte un implant cochléaire.",
-        "en": "Lawyer, has a cochlear implant."
+        "fr": "Responsable du secteur jeunesse, porte un implant cochléaire.",
+        "en": "Head of the children’s section, has a cochlear implant."
       },
       "tags": [
         "femme",
@@ -239,8 +240,8 @@ window.MLS_CHARACTERS = {
       "id": "malik",
       "name": "Malik",
       "description": {
-        "fr": "Consultant, la soixantaine.",
-        "en": "Consultant in his sixties."
+        "fr": "Bénévole des Amis de la médiathèque, la soixantaine.",
+        "en": "Volunteer with the Friends of the Library, in his sixties."
       },
       "tags": [
         "homme",

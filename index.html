@@ -10,6 +10,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='6' width='5' height='20' rx='1' fill='%23234e62'/%3E%3Crect x='11' y='4' width='5' height='22' rx='1' fill='%23487d96'/%3E%3Crect x='18' y='9' width='5' height='17' rx='1' fill='%237fa8bb'/%3E%3Crect x='24' y='8' width='4' height='18' rx='1' transform='rotate(12 26 17)' fill='%23d9b600'/%3E%3C/svg%3E">
 </head>
 <body>
+<!-- Visite guidée masquée pour l'instant : retirer « hidden » de #btnTour, #tourHint et #drawerTour pour la publier -->
 <header class="top">
   <div class="wrap top-inner">
     <div class="brand">
@@ -20,7 +21,7 @@
       </div>
     </div>
     <div class="top-actions">
-      <a class="iconbtn" id="btnTour" href="visite/" target="_blank" rel="noopener" aria-label="Visite guidée (nouvel onglet)" title="Visite guidée">
+      <a class="iconbtn" id="btnTour" hidden href="visite/" target="_blank" rel="noopener" aria-label="Visite guidée (nouvel onglet)" title="Visite guidée">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.9M12 17h.01"/></svg>
       </a>
       <button class="iconbtn" id="btnTheme" type="button" aria-label="Passer en mode sombre" title="Mode jour / nuit">
@@ -45,7 +46,7 @@
       </span>
       <strong>Déposez votre feuille de suivi de fonds</strong>
       <span>ou cliquez pour la choisir — Excel, ODS ou CSV, plusieurs onglets ou fichiers acceptés</span>
-      <span class="drop-hint">Première fois ? <a href="visite/" target="_blank" rel="noopener">Suivez la visite guidée</a> (5 minutes, dans un nouvel onglet).</span>
+      <span class="drop-hint" id="tourHint" hidden>Première fois ? <a href="visite/" target="_blank" rel="noopener">Suivez la visite guidée</a> (5 minutes, dans un nouvel onglet).</span>
       <span class="drop-hint">Vous avez une sauvegarde (classeur annoté ou ZIP avec photos) ? Déposez-la avec l'extraction pour retrouver votre travail.</span>
     </label>
     <div class="intro">
@@ -107,7 +108,7 @@
   <div class="drawer-head"><strong>Fonds affiché</strong><button class="iconbtn" id="drawerClose" type="button" aria-label="Fermer le menu">✕</button></div>
   <div class="drawer-fonds" id="drawerFonds"></div>
   <div class="drawer-foot">
-    <a class="btn ghost" href="visite/" target="_blank" rel="noopener">Visite guidée</a>
+    <a class="btn ghost" id="drawerTour" hidden href="visite/" target="_blank" rel="noopener">Visite guidée</a>
     <button class="btn ghost" id="drawerTheme" type="button"></button>
     <button class="btn ghost" id="drawerReset" type="button">Nouveau fichier</button>
   </div>
