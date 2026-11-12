@@ -341,8 +341,11 @@ window.SF = window.SF || {};
 
     // 3. Circulation
     if (ctx.has.dernier) {
-      const rows = c.ov.fonds.length > 1 ? [...c.ov.fonds, Object.assign({ name: 'Ensemble' }, t)] : [Object.assign({ name: c.label }, t)];
-      base('Un fonds qui circule', `${F.pct(t.tauxActif)} des documents sont sortis au moins une fois ces 12 derniers mois.`);
+      // plusieurs fonds : une barre par fonds + l'ensemble ; un seul fonds : sa barre + l'ensemble du fichier en repère
+      const rows = c.ov.fonds.length > 1 ? [...c.ov.fonds, Object.assign({ name: 'Ensemble' }, t)]
+        : [Object.assign({ name: c.label }, t)].concat(c.refAll ? [c.refAll] : []);
+      const cmpTxt = c.refAll ? ` (${F.pct(c.refAll.tauxActif)} pour l'ensemble des fonds).` : '.';
+      base('Un fonds qui circule', `${F.pct(t.tauxActif)} des documents sont sortis au moins une fois ces 12 derniers mois${cmpTxt}`);
       R.chart('hstack100', {
         labels: rows.map(r => r.name), colors: FRESH_COLORS,
         series: SF.FRAICHEUR.map((name, i) => ({ name, values: rows.map(r => (r.n ? r.fresh[i] / r.n : 0)) }))

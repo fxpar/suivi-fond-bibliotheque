@@ -135,8 +135,12 @@
     const items = selItems();
     const ov = SF.overview(items, state.ctx);
     const pistes = SF.pistes(items, state.ctx, state.opts);
-    return { items, ov, pistes, constats: SF.constats(ov, state.ctx, pistes), ctx: state.ctx, label: SF.selLabel() };
+    // repère : un seul fonds affiché alors que le fichier en compte plusieurs -> chiffres de l'ensemble
+    const refAll = state.fonds !== ALL && fondsNames().length > 1 ? Object.assign(SF.stats(state.items, state.ctx), { name: 'Tous les fonds (repère)' }) : null;
+    return { items, ov, pistes, constats: SF.constats(ov, state.ctx, pistes), ctx: state.ctx, label: SF.selLabel(), refAll };
   };
+  /** Périmètre des exports : le fonds affiché, ou tous les fonds (choix de l'onglet Exporter) */
+  const exportData = () => (state.exportAll && state.fonds !== ALL ? SF.computedAll() : SF.computed());
 
   document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
     state.tab = b.dataset.tab;
@@ -151,7 +155,7 @@
     renderChips();
     renderOverview(c);
     renderReview(c);
-    renderExport(c);
+    renderExport(exportData());
     const n = c.pistes.filter(p => p.id !== 'regul').reduce((a, p) => a + p.rows.length, 0);
     $('#reviewCount').textContent = F.int(n);
   }
@@ -318,7 +322,7 @@
       const prog = document.querySelector(`[data-prog="${p.id}"]`); if (prog) { prog.hidden = !nd; prog.firstElementChild.style.width = (nd / p.rows.length) * 100 + '%'; }
       const top = document.querySelector('[data-donetop]'); if (top) top.textContent = doneLabel(p) || 'Aucune ligne décidée';
     }
-    renderExport(state.c);
+    renderExport(exportData());
   });
 
   function decCell(p, r) {
@@ -364,7 +368,12 @@
     const nd = c.pistes.reduce((a, p) => a + doneCount(p), 0);
     const total = SF.dec.count();
     $('#tab-export').innerHTML = `
-      <p class="sub">Les exports reprennent le fonds sélectionné (<strong>${esc(c.label)}</strong>) et les seuils réglés dans « À examiner ».</p>
+      ${state.fonds !== ALL && fondsNames().length > 1
+        ? `<div class="scope" role="radiogroup" aria-label="Fonds exportés"><span>Exporter :</span>
+            <label><input type="radio" name="scope" value="sel"${state.exportAll ? '' : ' checked'}> le fonds affiché, <strong>${esc(state.fonds)}</strong></label>
+            <label><input type="radio" name="scope" value="all"${state.exportAll ? ' checked' : ''}> <strong>tous les fonds</strong></label></div>
+           <p class="sub">Les seuils réglés dans « À examiner » s'appliquent. Pour un seul fonds, la synthèse ajoute une barre « Tous les fonds » en repère.</p>`
+        : `<p class="sub">Les exports reprennent <strong>${esc(c.label)}</strong> et les seuils réglés dans « À examiner ».</p>`}
       <div class="exports">
         <article class="ex">
           <h3>Liste à examiner <span class="fmt">Excel</span></h3>
@@ -395,16 +404,20 @@
       const el = $('#phCount'); if (el) el.textContent = `${F.int(n)} ${F.plural(n, 'photo')}`;
       if (n) $('#decClear').hidden = false;
     });
-    $('#exZip').addEventListener('click', e => run(e.target, () => SF.exportZip(SF.computed())));
+    $('#exZip').addEventListener('click', e => run(e.target, () => SF.exportZip(exportData())));
+    document.querySelectorAll('#tab-export input[name=scope]').forEach(r => r.addEventListener('change', () => {
+      state.exportAll = r.value === 'all' && r.checked;
+      renderExport(exportData());
+    }));
     $('#decClear')?.addEventListener('click', async () => {
       if (!confirm('Effacer toutes les décisions, notes et photos gardées dans ce navigateur ? Ce qui a déjà été téléchargé (classeur, ZIP) n\'est pas touché.')) return;
       SF.dec.clear(); await SF.photos.clear(); render(); toast('Décisions et photos effacées de ce navigateur.');
     });
-    $('#exXlsx').addEventListener('click', e => run(e.target, () => SF.exportXlsx(SF.computed())));
-    $('#exPptx').addEventListener('click', e => run(e.target, () => SF.exportPptx(SF.computed())));
-    $('#exPdf').addEventListener('click', e => run(e.target, () => SF.exportPdf(SF.computed())));
+    $('#exXlsx').addEventListener('click', e => run(e.target, () => SF.exportXlsx(exportData())));
+    $('#exPptx').addEventListener('click', e => run(e.target, () => SF.exportPptx(exportData())));
+    $('#exPdf').addEventListener('click', e => run(e.target, () => SF.exportPdf(exportData())));
     $('#exIA').addEventListener('click', async () => {
-      const txt = SF.promptIA(SF.computed());
+      const txt = SF.promptIA(exportData());
       try { await navigator.clipboard.writeText(txt); toast('Résumé copié : collez-le dans votre assistant IA.'); }
       catch (_) { SF.download(new Blob([txt], { type: 'text/plain;charset=utf-8' }), 'resume-fonds.txt'); toast('Copie impossible : le résumé a été téléchargé en .txt'); }
     });

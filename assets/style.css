@@ -366,3 +366,8 @@ a.iconbtn { text-decoration: none; }
 /* retour au fichier en cours */
 .backbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 14px; font-size: .9rem; }
 .backbar #backName { font-weight: 700; overflow-wrap: anywhere; }
+
+/* périmètre des exports */
+.scope { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 12px 14px; margin-bottom: 6px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--gold); border-radius: var(--radius); font-size: .92rem; }
+.scope > span { font-weight: 700; }
+.scope label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
