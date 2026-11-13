@@ -135,6 +135,9 @@ window.SF = window.SF || {};
 
   /** Lit un fichier et renvoie { items, sheets:[{file,name,rows,map,skipped}] } */
   SF.readFile = async function (file) {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('La bibliothèque de lecture des tableurs n’a pas pu se charger. Rechargez la page (Ctrl + F5). Si le problème persiste, un bloqueur de publicités ou un filtrage réseau l’empêche peut-être de se télécharger.');
+    }
     if (/\.zip$/i.test(file.name)) return SF.readBackupZip(file); // sauvegarde classeur + photos
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: 'array', cellDates: true, codepage: 65001 });

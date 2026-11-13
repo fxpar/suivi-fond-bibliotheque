@@ -6,16 +6,16 @@ window.SF = window.SF || {};
 (function (SF) {
   const F = SF.fmt;
   const LIBS = {
-    exceljs: 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js',
-    pptx: 'https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js',
-    jspdf: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-    jszip: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+    exceljs: 'assets/vendor/exceljs-4.4.0.min.js',
+    pptx: 'assets/vendor/pptxgen-3.12.0.bundle.js',
+    jspdf: 'assets/vendor/jspdf-2.5.1.umd.min.js',
+    jszip: 'assets/vendor/jszip-3.10.1.min.js'
   };
   const loaded = {};
   function loadScript(url) {
     if (!loaded[url]) loaded[url] = new Promise((ok, ko) => {
       const s = document.createElement('script');
-      s.src = url; s.onload = ok; s.onerror = () => ko(new Error('bibliothèque d\'export indisponible (connexion ?)'));
+      s.src = url; s.onload = ok; s.onerror = () => { delete loaded[url]; ko(new Error('bibliothèque d\'export introuvable : rechargez la page (Ctrl + F5) et réessayez')); };
       document.head.appendChild(s);
     });
     return loaded[url];

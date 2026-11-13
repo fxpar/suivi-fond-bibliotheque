@@ -52,7 +52,7 @@ Sur téléphone ou tablette, le bouton à droite de la recherche ouvre la camér
 
 ## Confidentialité
 
-Tout se passe dans le navigateur. Le fichier n'est ni envoyé ni conservé : pas de serveur, pas de cookie, pas de mesure d'audience. Seules les décisions, notes et photos saisies sont gardées localement, sur l'appareil, et peuvent être effacées depuis l'onglet « Exporter ». Seules les bibliothèques JavaScript (SheetJS, ExcelJS, PptxGenJS, jsPDF, JSZip, ZXing) sont chargées depuis un CDN public.
+Tout se passe dans le navigateur. Le fichier n'est ni envoyé ni conservé : pas de serveur, pas de cookie, pas de mesure d'audience. Seules les décisions, notes et photos saisies sont gardées localement, sur l'appareil, et peuvent être effacées depuis l'onglet « Exporter ». Les bibliothèques JavaScript (SheetJS 0.18.5, ExcelJS 4.4.0, PptxGenJS 3.12.0, jsPDF 2.5.1, JSZip 3.10.1, ZXing 0.21.3, toutes sous licence libre) sont hébergées avec le site, dans `assets/vendor/` : la page n'appelle aucun serveur tiers, et fonctionne même quand un bloqueur ou un filtrage réseau empêche l'accès aux CDN.
 
 ## Colonnes reconnues
 

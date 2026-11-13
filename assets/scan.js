@@ -6,7 +6,7 @@
    L'image reste dans le téléphone : rien n'est envoyé. */
 'use strict';
 (function (SF) {
-  const ZXING = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+  const ZXING = 'assets/vendor/zxing-library-0.21.3.min.js';
   const $ = s => document.querySelector(s);
   const dlg = $('#scanner'), video = $('#scanVideo'), msg = $('#scanMsg'), btn = $('#btnScan'), torchBtn = $('#scanTorch');
 
