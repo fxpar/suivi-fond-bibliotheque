@@ -5,16 +5,22 @@ window.SF = window.SF || {};
 
 (function (SF) {
   // Nom des feuilles de l'export Excel (sert aussi à reconnaître un classeur annoté)
+  // Les numéros disent l'ordre de lecture ; « Critère - … » = liste complète sur un seul critère.
   SF.SHEETS = {
-    prio: 'Priorités',
-    faibles: 'Sortent moins (rayon)',
-    dormants: 'Retirer - sans prêt',
-    doublons: 'Retirer - doublons',
-    usure: 'Remplacer - usure',
-    demande: 'Renforcer - demande',
+    prio: '1 - Liste ciblée',
+    faibles: '2 - Sortent moins (rayon)',
+    dormants: 'Critère - sans prêt',
+    doublons: 'Critère - doublons',
+    usure: 'Critère - usure',
+    demande: 'Critère - forte demande',
     series: 'Séries à compléter',
     regul: 'À régulariser',
     rayon: 'Notes de rayon'
+  };
+  // anciens noms d'onglets : les classeurs déjà annotés restent réimportables
+  const OLD_SHEETS = {
+    'Priorités': 'prio', 'Sortent moins (rayon)': 'faibles', 'Retirer - sans prêt': 'dormants', 'Retirer - doublons': 'doublons',
+    'Remplacer - usure': 'usure', 'Renforcer - demande': 'demande'
   };
 
   // Choix proposés selon la liste (le premier est « on ne touche à rien »)
@@ -53,7 +59,8 @@ window.SF = window.SF || {};
   SF.rules = () => Object.keys(store).filter(k => k.startsWith('rule|') && store[k].d)
     .map(k => ({ key: k, type: k.split('|')[1], value: store[k].com || k.split('|').slice(2).join('|'), norm: k.split('|').slice(2).join('|') }));
   /** « Garder » ou « Mettre en avant » déjà décidé pour cet exemplaire, dans une liste ou sur sa fiche */
-  SF.isKept = it => ['prio', 'dormants', 'doublons', 'rayon'].some(pid => {
+  // `except` : liste dont on ignore les décisions (une décision prise dans la liste ciblée y reste visible)
+  SF.isKept = (it, except) => ['prio', 'dormants', 'doublons', 'rayon'].filter(pid => pid !== except).some(pid => {
     const e = store[SF.decKey(pid, { it })];
     return e && (e.d === 'Garder' || e.d === 'Mettre en avant');
   });
@@ -98,17 +105,21 @@ window.SF = window.SF || {};
 
   // ---------- réimport ----------
   /** Un classeur exporté par l'outil contient « Mode d'emploi » et au moins une feuille de pistes */
-  SF.isDecisionBook = wb => wb.SheetNames.includes('Mode d\'emploi') && wb.SheetNames.some(n => Object.values(SF.SHEETS).includes(n));
+  SF.isDecisionBook = wb => wb.SheetNames.includes('Mode d\'emploi') && wb.SheetNames.some(n => Object.values(SF.SHEETS).includes(n) || OLD_SHEETS[n]);
 
   SF.readDecisionBook = function (wb) {
     const entries = [];
-    const byName = Object.fromEntries(Object.entries(SF.SHEETS).map(([k, v]) => [v, k]));
+    const byName = Object.assign({}, OLD_SHEETS, Object.fromEntries(Object.entries(SF.SHEETS).map(([k, v]) => [v, k])));
     for (const name of wb.SheetNames) {
       if (name === SF.RULES_SHEET) { entries.push(...readRules(wb.Sheets[name])); continue; }
       const pid0 = byName[name];
       if (!pid0) continue;
       const pid = pid0 === 'faibles' ? 'prio' : pid0; // mêmes décisions que la liste ciblée
-      const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+      const all = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+      // la ligne d'en-têtes est la première qui contient « Décision » (ligne 3 depuis l'ajout du bandeau, ligne 1 avant)
+      const hi = all.slice(0, 8).findIndex(r => (r || []).some(v => SF.norm(v) === 'decision'));
+      if (hi < 0) continue;
+      const rows = all.slice(hi);
       if (rows.length < 2) continue;
       const h = rows[0].map(SF.norm);
       const col = label => h.indexOf(SF.norm(label));

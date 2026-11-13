@@ -146,7 +146,7 @@
       const cote = SF.norm(it.cote), txt = SF.norm(`${it.titre} ${it.serie}`);
       if (rules.some(r => (r.type === 'cote' ? cote : txt).includes(r.norm))) return 'regle';
     }
-    if (SF.isKept(it)) return 'garde';
+    if (SF.isKept(it, 'prio')) return 'garde'; // « Garder » décidé ailleurs (liste par critère, fiche en rayon)
     return null;
   }
 

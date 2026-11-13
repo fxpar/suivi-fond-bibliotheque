@@ -33,7 +33,7 @@ window.SF = window.SF || {};
   const strip = h => h.replace(/<[^>]+>/g, '');
 
   const SHEETS = SF.SHEETS;
-  const C = { ink: '1F2933', blue: '487D96', blueL: 'E4EEF2', amber: 'FBF3CC', grey: 'F3F2EE', line: 'D9D7D0' };
+  const C = { ink: '1F2933', blue: '487D96', blueL: 'E4EEF2', amber: 'FBF3CC', grey: 'F3F2EE', line: 'D9D7D0', gold: 'D9B600' };
 
   // ================= EXCEL =================
   SF.buildXlsx = async function (c, photoMap) {
@@ -51,6 +51,8 @@ window.SF = window.SF || {};
     line([`Données au ${F.date(c.ctx.ref)} · ${F.int(c.items.length)} exemplaires · seuils : sans prêt depuis ${c.pistes.opts.dormant} mois, usure dès ${c.pistes.opts.usure} prêts, forte demande dès ${c.pistes.opts.demande} prêts/an`]);
     line([]);
     line(['Ces listes sont des pistes à vérifier en rayon, pas des décisions automatiques.'], { bold: true });
+    line(['Par où commencer : l\'onglet « 1 - Liste ciblée », la liste courte des exemplaires qui cumulent plusieurs signaux, puis « 2 - Sortent moins (rayon) ». Les onglets « Critère - … » donnent chacun la liste complète sur un seul critère : un même document peut donc figurer dans plusieurs onglets.']);
+    line(['Pour imprimer : chaque onglet est déjà mis en page (paysage, caractères de 12 points, en-têtes répétés sur chaque page) et n\'imprime que les colonnes utiles en rayon. Les colonnes complémentaires (auteur, statut, dates…) restent consultables à droite dans Excel.']);
     line(['Chaque ligne indique son motif. Remplissez la colonne « Décision » (liste déroulante, saisie libre possible) et, si besoin, « Commentaire ». Les lignes surlignées demandent une attention particulière (tome d\'une série active, titre réservé, tome 1 absent).']);
     line(['Ce classeur sert de sauvegarde : redéposez-le dans l\'outil (seul ou avec une nouvelle extraction) pour retrouver les décisions. Gardez les noms d\'onglets et les colonnes Fonds, Cote, Titre, Série et Code-barres.']);
     line([]);
@@ -116,29 +118,45 @@ window.SF = window.SF || {};
     line([SF.RULES_SHEET, '', 'Rayons (déduits de la cote) et protections : « À conserver » les retire des propositions, « À repenser en bloc » les sort de la liste ciblée. Modifiable ici, réimportable.']);
 
     // --- Listes ---
+    // Chaque feuille : bandeau (titre + à quoi sert l'onglet), en-têtes en ligne 3, données ensuite.
+    // Impression : seules les colonnes utiles en rayon sont imprimées (zone d'impression), en 12 points,
+    // paysage, une page en largeur ; les autres colonnes restent à droite, consultables dans Excel.
+    const pf = p => p.id === 'prio' || p.id === 'faibles';
+    const BAND = {
+      prio: ['Liste ciblée : par où commencer', 'Les exemplaires qui cumulent plusieurs signaux, comparés à leur propre rayon, sans raison évidente de les garder. C’est la liste courte à examiner en premier.'],
+      faibles: ['Documents qui sortent moins que leur rayon', ''],
+      dormants: [`Tous les documents sans prêt depuis ${c.pistes.opts.dormant} mois (un seul critère)`, 'Liste complète sur ce seul critère, pour un passage systématique. Les cas prioritaires, qui cumulent plusieurs signaux, sont dans l’onglet « 1 - Liste ciblée ».'],
+      doublons: ['Doublons peu demandés (un seul critère)', ''],
+      usure: [`Exemplaires de plus de ${c.pistes.opts.usure} prêts : état à vérifier`, ''],
+      demande: ['Forte demande : un exemplaire de plus ?', ''],
+      series: ['Séries incomplètes qui circulent', ''],
+      regul: ['Statuts à régulariser', '']
+    };
+    const TAB = { prio: C.gold, faibles: C.gold, series: '2E7D5B', demande: '2E7D5B', usure: 'A8642A', regul: '8A8A8A' };
     for (const p of lists) {
       if (!p.rows.length) continue;
-      const ws = wb.addWorksheet(SHEETS[p.id], {
-        views: [{ state: 'frozen', ySplit: 1 }],
-        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printTitlesRow: '1:1', margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } },
-        headerFooter: { oddFooter: `&L${SHEETS[p.id]} — ${c.label}&RPage &P / &N` }
+      const name = SHEETS[p.id];
+      const ws = wb.addWorksheet(name, {
+        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, margins: { left: 0.35, right: 0.35, top: 0.45, bottom: 0.5, header: 0.2, footer: 0.2 } },
+        headerFooter: { oddFooter: `&L${name} — ${c.label}&RPage &P / &N` }
       });
       const rows = [...p.rows];
-      let cols;
+      let cols, nPrint;
       if (p.kind === 'series') {
-        cols = [
-          { header: 'Fonds', key: 'fonds', width: 18 },
-          { header: 'Cote', key: 'cote', width: 14 },
-          { header: 'Série', key: 'serie', width: 36 },
-          { header: 'Tomes présents', key: 'pres', width: 20 },
-          { header: 'Tomes manquants', key: 'manq', width: 18 },
-          { header: 'Dans un autre fonds', key: 'ail', width: 24 },
-          { header: 'Prêts an (série)', key: 'pa', width: 14 },
-          { header: 'Motif', key: 'motif', width: 26 },
-          { header: 'Décision', key: 'dec', width: 16 },
-          { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
-          { header: 'Commentaire', key: 'com', width: 34 }
+        const printed = [
+          multi && { header: 'Fonds', key: 'fonds', width: 13 },
+          { header: 'Cote', key: 'cote', width: 12 },
+          { header: 'Série', key: 'serie', width: 30 },
+          { header: 'Tomes présents', key: 'pres', width: 15 },
+          { header: 'Tomes manquants', key: 'manq', width: 15 },
+          { header: 'Dans un autre fonds', key: 'ail', width: 18 },
+          { header: 'Prêts an (série)', key: 'pa', width: 9 },
+          { header: 'Motif', key: 'motif', width: 22 },
+          { header: 'Décision', key: 'dec', width: 15 },
+          { header: 'Commentaire', key: 'com', width: 24 }
         ].filter(Boolean);
+        cols = printed.concat([!multi && { header: 'Fonds', key: 'fonds', width: 14 }, { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } }].filter(Boolean));
+        nPrint = printed.length;
         ws.columns = cols;
         rows.sort((a, b) => a.prio - b.prio || cmp(a.serie.cote, b.serie.cote) || cmp(a.serie.nom, b.serie.nom));
         for (const r of rows) {
@@ -146,49 +164,47 @@ window.SF = window.SF || {};
           if (r.prio === 0) row.getCell('motif').fill = fill(C.amber);
         }
       } else {
-        cols = [
-          { header: 'Fonds', key: 'fonds', width: 16 },
-          { header: 'Cote', key: 'cote', width: 14 },
-          { header: 'Titre', key: 'titre', width: 40 },
-          { header: 'Série', key: 'serie', width: 22 },
+        const printed = [
+          multi && { header: 'Fonds', key: 'fonds', width: 13 },
+          { header: 'Cote', key: 'cote', width: 12 },
+          { header: 'Titre', key: 'titre', width: 30 },
+          { header: 'Série', key: 'serie', width: 20 },
+          { header: 'Code-barres', key: 'cb', width: 16, style: { numFmt: '@' } },
+          { header: 'Dernier prêt', key: 'dernier', width: 13.5, style: { numFmt: 'dd/mm/yyyy' } },
+          { header: 'Prêts an', key: 'pa', width: 7 },
+          { header: 'Motif', key: 'motif', width: 36 },
+          { header: 'Décision', key: 'dec', width: 15 },
+          { header: 'Commentaire', key: 'com', width: 24 }
+        ].filter(Boolean);
+        // colonnes complémentaires : dans le classeur, mais hors impression
+        const extra = [
+          !multi && { header: 'Fonds', key: 'fonds', width: 14 },
           { header: 'Tome', key: 'tome', width: 7 },
           { header: 'Auteur', key: 'auteur', width: 22 },
-          { header: 'Code-barres', key: 'cb', width: 17, style: { numFmt: '@' } },
           { header: 'Statut', key: 'statut', width: 14 },
-          { header: 'Dernier prêt', key: 'dernier', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
-          { header: 'Prêts an', key: 'pa', width: 9 },
           { header: 'Prêts total', key: 'pv', width: 10 },
           { header: 'Publication', key: 'pub', width: 11 },
           { header: 'Entrée', key: 'crea', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
-          { header: 'Motif', key: 'motif', width: 34 },
-          { header: 'À noter', key: 'note', width: 40 },
-          { header: 'Décision', key: 'dec', width: 16 },
-          { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
-          { header: 'Commentaire', key: 'com', width: 30 }
+          { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } }
         ].filter(Boolean);
+        cols = printed.concat(extra);
+        nPrint = printed.length;
         ws.columns = cols;
         // tri pour le passage en rayon : fonds, cote, série, tome, titre
         rows.sort((a, b) => cmp(a.it.fonds, b.it.fonds) || cmp(a.it.cote, b.it.cote) || cmp(a.it.serie, b.it.serie) || (a.it.tome ?? 0) - (b.it.tome ?? 0) || cmp(a.it.titre, b.it.titre));
         for (const r of rows) {
           const it = r.it;
           const row = ws.addRow({
-            fonds: it.fonds, cote: it.cote, titre: it.titre, serie: it.serie, tome: it.tome, auteur: it.auteur.split(/[,;]\s*(?=[A-ZÀ-Ý])/)[0],
-            cb: it.cb, statut: it.statut.replace(/\s*\([A-Z]+\)$/, ''), dernier: utc(it.dernier), pa: it.pa, pv: it.pv, pub: it.pub, crea: utc(it.crea),
-            motif: r.motif, note: r.note, ...decOf(p, r)
+            fonds: it.fonds, cote: it.cote, titre: it.titre, serie: it.serie ? it.serie + (it.tome != null ? `, t. ${it.tome}` : '') : '', tome: it.tome,
+            auteur: it.auteur.split(/[,;]\s*(?=[A-ZÀ-Ý])/)[0], cb: it.cb, statut: it.statut.replace(/\s*\([A-Z]+\)$/, ''), dernier: utc(it.dernier),
+            pa: it.pa, pv: it.pv, pub: it.pub, crea: utc(it.crea),
+            motif: r.note ? `${r.motif}\n${r.note}` : r.motif, ...decOf(p, r)
           });
-          if (r.prio === 0 || r.flag) row.getCell('note').fill = fill(C.amber);
+          if (r.prio === 0 || r.flag) row.getCell('motif').fill = fill(C.amber);
         }
       }
-      styleHeader(ws);
-      const decCol = ws.getColumn('dec').number;
-      for (let i = 2; i <= ws.rowCount; i++) {
-        const cell = ws.getRow(i).getCell(decCol);
-        // liste propre à l'onglet, mais saisie libre acceptée (showErrorMessage: false)
-        cell.dataValidation = { type: 'list', allowBlank: true, showErrorMessage: false, formulae: [`"${SF.CHOICES[p.id].join(',')}"`] };
-        if (cell.value) cell.fill = fill(C.blueL);
-        ws.getRow(i).alignment = { vertical: 'top', wrapText: true };
-      }
-      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+      const band = BAND[p.id] || [p.title || name, ''];
+      finishSheet(ws, cols, nPrint, band[0], band[1] || `${p.why || ''} ${p.caution || ''}`.trim(), SF.CHOICES[p.id], TAB[p.id]);
     }
 
     // --- Notes de rayon (constats saisis depuis la fiche d'un exemplaire) ---
@@ -197,49 +213,80 @@ window.SF = window.SF || {};
     const notes = c.items.map(it => { const k = SF.decKey('rayon', { it }); return { it, d: SF.dec.get(k), ph: pm.get(k) || [] }; }).filter(x => x.d || x.ph.length);
     if (notes.length) {
       const ws = wb.addWorksheet(SHEETS.rayon, {
-        views: [{ state: 'frozen', ySplit: 1 }],
-        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, printTitlesRow: '1:1' }
+        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9, margins: { left: 0.35, right: 0.35, top: 0.45, bottom: 0.5, header: 0.2, footer: 0.2 } },
+        headerFooter: { oddFooter: `&L${SHEETS.rayon} — ${c.label}&RPage &P / &N` }
       });
-      const cols = [
-        { header: 'Fonds', key: 'fonds', width: 16 }, { header: 'Cote', key: 'cote', width: 14 }, { header: 'Titre', key: 'titre', width: 40 },
-        { header: 'Série', key: 'serie', width: 22 }, { header: 'Tome', key: 'tome', width: 7 }, { header: 'Auteur', key: 'auteur', width: 22 },
-        { header: 'Code-barres', key: 'cb', width: 17, style: { numFmt: '@' } }, { header: 'Statut', key: 'statut', width: 14 },
-        { header: 'Dernier prêt', key: 'dernier', width: 12, style: { numFmt: 'dd/mm/yyyy' } }, { header: 'Prêts an', key: 'pa', width: 9 },
-        { header: 'Prêts total', key: 'pv', width: 10 },
-        { header: 'Décision', key: 'dec', width: 16 }, { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
-        { header: 'Commentaire', key: 'com', width: 40 }
-      ];
       const nph = Math.min(3, Math.max(0, ...notes.map(x => x.ph.length)));
-      for (let i = 1; i <= nph; i++) cols.push({ header: `Photo ${i}`, key: 'ph' + i, width: 11 });
-      if (notes.some(x => x.ph.length > 3)) cols.push({ header: 'Autres photos', key: 'phx', width: 40 });
+      const printed = [
+        multi && { header: 'Fonds', key: 'fonds', width: 13 },
+        { header: 'Cote', key: 'cote', width: 12 }, { header: 'Titre', key: 'titre', width: 30 }, { header: 'Série', key: 'serie', width: 20 },
+        { header: 'Code-barres', key: 'cb', width: 16, style: { numFmt: '@' } },
+        { header: 'Décision', key: 'dec', width: 15 }, { header: 'Commentaire', key: 'com', width: 36 }
+      ].filter(Boolean);
+      for (let i = 1; i <= nph; i++) printed.push({ header: `Photo ${i}`, key: 'ph' + i, width: 9 });
+      const cols = printed.concat([
+        !multi && { header: 'Fonds', key: 'fonds', width: 14 },
+        { header: 'Tome', key: 'tome', width: 7 }, { header: 'Auteur', key: 'auteur', width: 22 }, { header: 'Statut', key: 'statut', width: 14 },
+        { header: 'Dernier prêt', key: 'dernier', width: 12, style: { numFmt: 'dd/mm/yyyy' } }, { header: 'Prêts an', key: 'pa', width: 9 },
+        { header: 'Prêts total', key: 'pv', width: 10 }, { header: 'Décidé le', key: 'dated', width: 12, style: { numFmt: 'dd/mm/yyyy' } },
+        notes.some(x => x.ph.length > 3) && { header: 'Autres photos', key: 'phx', width: 40 }
+      ].filter(Boolean));
       ws.columns = cols;
       notes.sort((a, b) => cmp(a.it.fonds, b.it.fonds) || cmp(a.it.cote, b.it.cote) || cmp(a.it.titre, b.it.titre));
       for (const { it, ph } of notes) {
         const row = ws.addRow({
-          fonds: it.fonds, cote: it.cote, titre: it.titre, serie: it.serie, tome: it.tome, auteur: it.auteur.split(/[,;]\s*(?=[A-ZÀ-Ý])/)[0],
-          cb: it.cb, statut: it.statut.replace(/\s*\([A-Z]+\)$/, ''), dernier: utc(it.dernier), pa: it.pa, pv: it.pv,
+          fonds: it.fonds, cote: it.cote, titre: it.titre, serie: it.serie ? it.serie + (it.tome != null ? `, t. ${it.tome}` : '') : '', tome: it.tome,
+          auteur: it.auteur.split(/[,;]\s*(?=[A-ZÀ-Ý])/)[0], cb: it.cb, statut: it.statut.replace(/\s*\([A-Z]+\)$/, ''), dernier: utc(it.dernier), pa: it.pa, pv: it.pv,
           ...decOf({ id: 'rayon' }, { it }),
           phx: ph.length > 3 ? ph.slice(3).join(' ; ') : null
         });
         // liens relatifs : ils fonctionnent une fois le ZIP décompressé (classeur et dossier photos côte à côte)
-        ph.slice(0, 3).forEach((name, i) => {
+        ph.slice(0, 3).forEach((nm, i) => {
           const cell = row.getCell('ph' + (i + 1));
-          cell.value = { text: `Voir ${i + 1}`, hyperlink: 'photos/' + name, tooltip: name };
+          cell.value = { text: `Voir ${i + 1}`, hyperlink: 'photos/' + nm, tooltip: nm };
           cell.font = { color: { argb: 'FF' + C.blue }, underline: true };
         });
       }
-      styleHeader(ws);
-      const decCol = ws.getColumn('dec').number;
-      for (let i = 2; i <= ws.rowCount; i++) {
-        ws.getRow(i).getCell(decCol).dataValidation = { type: 'list', allowBlank: true, showErrorMessage: false, formulae: [`"${SF.CHOICES.rayon.join(',')}"`] };
-        ws.getRow(i).alignment = { vertical: 'top', wrapText: true };
-      }
-      ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } };
+      finishSheet(ws, cols, printed.length, 'Notes de rayon', 'Constats notés depuis la fiche d’un exemplaire (recherche ou scan en rayon).' + (pm.size ? ' Les liens « Voir » ouvrent les photos du dossier « photos » : décompressez le ZIP avant d’ouvrir le classeur.' : ''), SF.CHOICES.rayon, C.blue);
       line([SHEETS.rayon, notes.length, 'Constats notés depuis la fiche d\'un exemplaire (recherche ou scan en rayon).' + (pm.size ? ' Les liens « Voir » ouvrent les photos du dossier « photos » : décompressez le ZIP avant d\'ouvrir le classeur.' : '')]);
     }
 
     return wb.xlsx.writeBuffer();
   };
+
+  /** Bandeau, en-têtes en ligne 3, police lisible, listes de choix, filtres, zone d'impression */
+  const colLetter = n => { let s = ''; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  function finishSheet(ws, cols, nPrint, title, sub, choices, tab) {
+    ws.spliceRows(1, 0, [title], [sub || '']);
+    ws.mergeCells(1, 1, 1, nPrint);
+    ws.mergeCells(2, 1, 2, nPrint);
+    const t = ws.getCell(1, 1);
+    t.font = { bold: true, size: 15, color: { argb: 'FF' + C.ink } };
+    t.alignment = { vertical: 'middle' };
+    ws.getRow(1).height = 26;
+    const s = ws.getCell(2, 1);
+    s.font = { size: 11, italic: true, color: { argb: 'FF5F6B76' } };
+    s.alignment = { wrapText: true, vertical: 'top' };
+    ws.getRow(2).height = sub && sub.length > 140 ? 44 : 30;
+    styleHeader(ws, 3);
+    const decCol = cols.findIndex(x => x.key === 'dec') + 1;
+    for (let i = 4; i <= ws.rowCount; i++) {
+      const row = ws.getRow(i);
+      row.eachCell({ includeEmpty: true }, cell => { cell.font = Object.assign({}, cell.font, { size: 12 }); });
+      row.alignment = { vertical: 'top', wrapText: true };
+      if (decCol && choices) {
+        const cell = row.getCell(decCol);
+        // liste propre à l'onglet, mais saisie libre acceptée (showErrorMessage: false)
+        cell.dataValidation = { type: 'list', allowBlank: true, showErrorMessage: false, formulae: [`"${choices.join(',')}"`] };
+        if (cell.value) cell.fill = fill(C.blueL);
+      }
+    }
+    ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: cols.length } };
+    ws.views = [{ state: 'frozen', ySplit: 3 }];
+    ws.pageSetup.printArea = `A1:${colLetter(nPrint)}${ws.rowCount}`;
+    ws.pageSetup.printTitlesRow = '3:3';
+    if (tab) ws.properties.tabColor = { argb: 'FF' + tab };
+  }
 
   const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   SF.xlsxName = c => `pistes-${slug(c.label)}-${stamp(c.ctx.ref)}.xlsx`;
@@ -313,9 +360,9 @@ window.SF = window.SF || {};
   const cmp = (a, b) => String(a || '').localeCompare(String(b || ''), 'fr', { numeric: true });
   const fill = hex => ({ type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + hex } });
   const utc = d => (d ? new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())) : null);
-  function styleHeader(ws) {
-    const h = ws.getRow(1);
-    h.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  function styleHeader(ws, n = 1) {
+    const h = ws.getRow(n);
+    h.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
     h.fill = fill(C.blue);
     h.alignment = { vertical: 'middle', wrapText: true };
     h.height = 30;
