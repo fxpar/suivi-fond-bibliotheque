@@ -12,6 +12,13 @@
   <style>
     #loading { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #4a5359; }
     #loading[hidden] { display: none; }
+    /* Quitter la visite : bouton de l'en-tête (texte masqué sur petit écran) et lien sur l'accueil */
+    .sf-exit { display: inline-flex; align-items: center; gap: .35rem; width: auto !important; padding: 0 .7rem; text-decoration: none; font-weight: 600; font-size: .9rem; }
+    @media (max-width: 640px) { .sf-exit span { display: none; } .sf-exit { padding: 0; width: 40px !important; justify-content: center; }
+      .mls-top [data-act="fullscreen"] { display: none; } /* place pour « Quitter » ; peu utile sur téléphone */ }
+    .sf-exit-link { text-align: center; margin: .9rem 0 0; font-size: .9rem; }
+    .sf-exit-link a { color: inherit; opacity: .75; }
+    .sf-exit-link a:hover { opacity: 1; }
     /* Couleurs de l'outil (bleu #487D96, doré #D9B600) à la place du violet de MicroLearn */
     body.mls-body { background: #f3f6f7; }
     #player.mls-player { --mls-ink: #1f2933; --mls-muted: #4a5359; --mls-soft: #e4eef2; --mls-bg1: #f1f5f7; --mls-bg2: #fbf6e1;

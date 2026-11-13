@@ -424,6 +424,32 @@
     };
   }
 
+  /* ----------------------------------------------- sortir de la visite à tout moment
+     Un bouton dans l'en-tête (toujours visible) et un lien sur l'écran de choix des guides. */
+  var EXIT_URL = '../';
+  function installExit(player) {
+    var acts = player.root.querySelector('.mls-top-actions');
+    if (acts && !acts.querySelector('.sf-exit')) {
+      var a = document.createElement('a');
+      a.className = 'mls-icon-btn sf-exit';
+      a.href = EXIT_URL;
+      a.title = 'Quitter la visite et revenir à l’outil';
+      a.setAttribute('aria-label', 'Quitter la visite et revenir à l’outil');
+      a.innerHTML = '<i class="bi bi-box-arrow-right"></i><span>Quitter</span>';
+      acts.appendChild(a);
+    }
+    var openWelcome = player.openWelcome;
+    player.openWelcome = function () {
+      var r = openWelcome.apply(this, arguments);
+      var w = this.root.querySelector('.mls-welcome-actions');
+      if (w && !w.parentNode.querySelector('.sf-exit-link')) {
+        w.insertAdjacentHTML('afterend', '<p class="sf-exit-link"><a href="' + EXIT_URL + '"><i class="bi bi-arrow-left"></i> Revenir à l’outil sans faire la visite</a></p>');
+      }
+      return r;
+    };
+    if (!player.root.querySelector('.mls-welcome').hidden) player.openWelcome(false); // l'accueil est déjà affiché
+  }
+
   /* ------------------------------------------------------------------ lancement */
   function marks(md) {
     // {prenom} -> « Marie » ; {, prenom} -> « , Marie » ; sans prénom, la marque entière disparaît
@@ -449,6 +475,7 @@
     player.openEnd = function () { this.gradable = {}; this.scores = {}; return openEnd.apply(this, arguments); };
     player.load(md, { welcome: true });
     installBranching(player);
+    installExit(player);
     applyName(getName());
     document.getElementById('loading').hidden = true;
   }).catch(function (e) {
